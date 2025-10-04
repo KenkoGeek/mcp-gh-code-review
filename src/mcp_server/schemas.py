@@ -156,6 +156,8 @@ class SetPolicyRequest(BaseModel):
 class HealthResponse(BaseModel):
     status: str = "ok"
     version: str
+    database_healthy: bool = True
+    rate_limit: dict = Field(default_factory=dict)
 
 
 def schema_for(model: type[BaseModel]) -> dict:

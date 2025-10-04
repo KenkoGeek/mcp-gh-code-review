@@ -3,19 +3,28 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import httpx
+import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from .config import GitHubConfig
 from .schemas import Action, ActionResult, ActionType
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(slots=True)
 class GitHubClient:
     config: GitHubConfig
     base_url: str = "https://api.github.com"
+    _client: httpx.Client = field(init=False, repr=False)
+    rate_limit_remaining: int = field(default=5000, init=False)
+    rate_limit_reset: int = field(default=0, init=False)
+
+    def __post_init__(self) -> None:
+        self._client = httpx.Client(timeout=10.0, headers=self._headers())
 
     def _headers(self) -> dict[str, str]:
         headers = {"Accept": "application/vnd.github+json"}
@@ -23,19 +32,29 @@ class GitHubClient:
             headers["Authorization"] = f"Bearer {self.config.token}"
         return headers
 
+    def _update_rate_limits(self, response: httpx.Response) -> None:
+        if "X-RateLimit-Remaining" in response.headers:
+            self.rate_limit_remaining = int(response.headers["X-RateLimit-Remaining"])
+        if "X-RateLimit-Reset" in response.headers:
+            self.rate_limit_reset = int(response.headers["X-RateLimit-Reset"])
+        logger.debug("rate_limit_updated", remaining=self.rate_limit_remaining, reset=self.rate_limit_reset)
+
     @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3))
     def post(self, path: str, payload: dict | None = None) -> httpx.Response:
-        with httpx.Client(timeout=10.0) as client:
-            response = client.post(f"{self.base_url}{path}", headers=self._headers(), json=payload)
-            response.raise_for_status()
-            return response
+        response = self._client.post(f"{self.base_url}{path}", json=payload)
+        self._update_rate_limits(response)
+        response.raise_for_status()
+        return response
 
     @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3))
     def patch(self, path: str, payload: dict | None = None) -> httpx.Response:
-        with httpx.Client(timeout=10.0) as client:
-            response = client.patch(f"{self.base_url}{path}", headers=self._headers(), json=payload)
-            response.raise_for_status()
-            return response
+        response = self._client.patch(f"{self.base_url}{path}", json=payload)
+        self._update_rate_limits(response)
+        response.raise_for_status()
+        return response
+
+    def close(self) -> None:
+        self._client.close()
 
 
 @dataclass(slots=True)
@@ -56,6 +75,7 @@ class ActionExecutor:
         return results
 
     def _apply_action(self, action: Action) -> None:
+        logger.info("applying_action", action_type=action.type.value)
         if action.type == ActionType.apply_label and action.metadata:
             pr = action.metadata.get("pr")
             if pr:

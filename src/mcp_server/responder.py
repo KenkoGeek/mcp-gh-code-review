@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import structlog
+
 from .schemas import Action, ActionType, GenerateReplyRequest, GenerateReplyResponse
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -12,6 +16,7 @@ class Responder:
     """Generate replies for comments and review threads."""
 
     def generate(self, request: GenerateReplyRequest) -> GenerateReplyResponse:
+        logger.info("generating_reply", actor_type=request.actor_type.value, thread_id=request.thread.id)
         if request.actor_type.value == "bot":
             body = self._bot_reply(request)
             followups = [

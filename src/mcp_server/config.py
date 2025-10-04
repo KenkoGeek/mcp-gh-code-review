@@ -27,6 +27,7 @@ class ServerConfig:
     bot_actors: list[str] = field(default_factory=list)
     dry_run: bool = False
     policy_path: Path | None = None
+    db_path: Path = field(default_factory=lambda: Path(".mcp/threads.db"))
     log_level: str = "INFO"
 
 
@@ -62,7 +63,12 @@ DEFAULT_BOT_PATTERNS = [
 
 
 def load_policy(path: Path) -> PolicyConfig:
-    data = yaml.safe_load(path.read_text()) if path.exists() else {}
+    if not path.exists():
+        return PolicyConfig()
+    try:
+        data = yaml.safe_load(path.read_text())
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Invalid YAML in policy file: {exc}") from exc
     if not isinstance(data, MutableMapping):  # pragma: no cover - defensive
         raise ValueError("Policy file must contain a mapping")
     labels = {str(k): list(v) for k, v in data.get("labels", {}).items()}
@@ -79,7 +85,10 @@ def load_policy(path: Path) -> PolicyConfig:
     )
 
 
-def load_from_env(env: Mapping[str, str]) -> ServerConfig:
+def load_from_env(env: Mapping[str, str] | None = None) -> ServerConfig:
+    import os
+    if env is None:
+        env = os.environ
     github = GitHubConfig(
         app_id=int(env["GITHUB_APP_ID"]) if env.get("GITHUB_APP_ID") else None,
         private_key=env.get("GITHUB_PRIVATE_KEY"),
@@ -94,6 +103,7 @@ def load_from_env(env: Mapping[str, str]) -> ServerConfig:
     if env.get("BOT_ACTORS"):
         patterns.extend(x.strip() for x in env["BOT_ACTORS"].split(",") if x.strip())
     policy_path = Path(env["POLICY_PATH"]) if env.get("POLICY_PATH") else None
+    db_path = Path(env.get("DB_PATH", ".mcp/threads.db"))
     dry_run = env.get("DRY_RUN", "false").lower() in {"1", "true", "yes"}
     log_level = env.get("LOG_LEVEL", "INFO")
     return ServerConfig(
@@ -101,6 +111,7 @@ def load_from_env(env: Mapping[str, str]) -> ServerConfig:
         bot_actors=patterns,
         dry_run=dry_run,
         policy_path=policy_path,
+        db_path=db_path,
         log_level=log_level,
     )
 

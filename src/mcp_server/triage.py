@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import structlog
+
 from .classifier import ActorClassifier
+
+logger = structlog.get_logger(__name__)
 from .config import PolicyConfig
 from .schemas import (
     Action,
@@ -30,6 +34,7 @@ class TriageEngine:
         classification = self.classifier.classify(
             event.actor_login, name=getattr(event, "actor_name", None)
         )
+        logger.info("triaging_event", event_id=event.event_id, actor=event.actor_login, actor_type=classification.actor_type)
         triaged = TriagedActions()
         if isinstance(event, ReviewEvent):
             self._handle_review(event, triaged)

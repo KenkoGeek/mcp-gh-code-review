@@ -48,7 +48,7 @@ class MCPServer:
         responder = Responder()
         triage_engine = TriageEngine(classifier=classifier, policy=policy)
         action_executor = ActionExecutor(client=GitHubClient(config=config.github))
-        storage = Storage(Path(".mcp") / "threads.db")
+        storage = Storage(config.db_path)
         thread_manager = ThreadManager(storage=storage)
         return cls(
             config=config,
@@ -113,7 +113,16 @@ class MCPServer:
         return {"ok": True}
 
     async def health(self, params: dict[str, Any]) -> dict[str, Any]:
-        return HealthResponse(version="0.1.0").model_dump()
+        db_healthy = self.thread_manager.storage.health_check()
+        rate_limit = {
+            "remaining": self.action_executor.client.rate_limit_remaining,
+            "reset": self.action_executor.client.rate_limit_reset,
+        }
+        return HealthResponse(
+            version="0.1.0",
+            database_healthy=db_healthy,
+            rate_limit=rate_limit,
+        ).model_dump()
 
     async def serve_stdio(self) -> None:
         server = JSONRPCServer(self.jsonrpc_handlers())

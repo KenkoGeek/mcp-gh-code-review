@@ -34,20 +34,29 @@ class ActorClassifier:
             result = Classification(actor_type="bot", reason="[bot] suffix", matched_rule="suffix")
         elif normalized.endswith("-bot"):
             result = Classification(actor_type="bot", reason="-bot suffix", matched_rule="suffix")
-        elif any(pattern.search(login) for pattern in self._patterns):
-            matched = next(pattern.pattern for pattern in self._patterns if pattern.search(login))
-            result = Classification(
-                actor_type="bot", reason="matched configured pattern", matched_rule=matched
-            )
-        elif name and any(pattern.search(name) for pattern in self._patterns):
-            matched = next(
-                pattern.pattern for pattern in self._patterns if pattern.search(name or "")
-            )
-            result = Classification(
-                actor_type="bot", reason="matched name pattern", matched_rule=matched
-            )
         else:
-            result = Classification(actor_type="human", reason="no bot pattern matched")
+            matched_pattern = None
+            for pattern in self._patterns:
+                if pattern.search(login):
+                    matched_pattern = pattern.pattern
+                    break
+            if matched_pattern:
+                result = Classification(
+                    actor_type="bot", reason="matched configured pattern", matched_rule=matched_pattern
+                )
+            elif name:
+                for pattern in self._patterns:
+                    if pattern.search(name):
+                        matched_pattern = pattern.pattern
+                        break
+                if matched_pattern:
+                    result = Classification(
+                        actor_type="bot", reason="matched name pattern", matched_rule=matched_pattern
+                    )
+                else:
+                    result = Classification(actor_type="human", reason="no bot pattern matched")
+            else:
+                result = Classification(actor_type="human", reason="no bot pattern matched")
         self._cache[cache_key] = result
         return result
 
