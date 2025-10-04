@@ -1,0 +1,28 @@
+# Code Owners
+# Lines starting with '#' are comments.
+# Each line is a file pattern followed by one or more owners.
+
+# Default owners for everything in the repo
+* @ops-team
+
+# Core MCP server implementation
+/src/mcp_server/ @backend-team @mcp-maintainers
+
+# Configuration and policies
+/config/ @ops-team @security-team
+/.env.example @ops-team
+/pyproject.toml @backend-team
+
+# Security-sensitive files
+/SECURITY.md @security-team
+/Dockerfile @ops-team @security-team
+
+# CI/CD workflows
+/.github/workflows/ @devops-team @ops-team
+
+# Documentation
+/docs/ @docs-team
+/README.md @docs-team @ops-team
+
+# Tests require approval from code owners
+/tests/ @backend-team @qa-team
