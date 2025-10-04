@@ -1,0 +1,10 @@
+labels:
+  src/: ["area-core"]
+  docs/: ["area-docs"]
+owners:
+  src/: ["core-team"]
+auto_approve_paths:
+  - docs/
+protected_paths:
+  infra/: ["platform-team"]
+sla_hours: 24
