@@ -15,28 +15,89 @@ Handler = Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]
 @dataclass(slots=True)
 class JSONRPCServer:
     handlers: dict[str, Handler]
+    schemas: dict[str, dict[str, Any]] | None = None
 
     async def handle(self, message: dict[str, Any]) -> dict[str, Any]:
         if "method" not in message:
             raise ValueError("Invalid JSON-RPC request")
         method = message["method"]
+        
+        # Handle MCP protocol methods
+        if method == "initialize":
+            return await self._handle_initialize(message)
+        elif method == "tools/list":
+            return await self._handle_tools_list(message)
+        elif method == "tools/call":
+            return await self._handle_tools_call(message)
+        
         handler = self.handlers.get(method)
         if handler is None:
             raise ValueError(f"Unknown method: {method}")
         params = message.get("params", {})
         result = await handler(params)
         return {"jsonrpc": "2.0", "id": message.get("id"), "result": result}
+    
+    async def _handle_initialize(self, message: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "jsonrpc": "2.0",
+            "id": message.get("id"),
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "github-review", "version": "0.1.0"}
+            }
+        }
+    
+    async def _handle_tools_list(self, message: dict[str, Any]) -> dict[str, Any]:
+        tools = []
+        for name, handler in self.handlers.items():
+            tool = {"name": name, "description": f"MCP tool: {name}"}
+            if self.schemas and name in self.schemas:
+                tool["inputSchema"] = self.schemas[name]
+            else:
+                tool["inputSchema"] = {"type": "object", "properties": {}}
+            tools.append(tool)
+        return {"jsonrpc": "2.0", "id": message.get("id"), "result": {"tools": tools}}
+    
+    async def _handle_tools_call(self, message: dict[str, Any]) -> dict[str, Any]:
+        params = message.get("params", {})
+        tool_name = params.get("name")
+        tool_args = params.get("arguments", {})
+        
+        if tool_name not in self.handlers:
+            raise ValueError(f"Unknown tool: {tool_name}")
+        
+        result = await self.handlers[tool_name](tool_args)
+        return {
+            "jsonrpc": "2.0",
+            "id": message.get("id"),
+            "result": {"content": [{"type": "text", "text": str(result)}]}
+        }
 
     async def serve_stdio(self) -> None:
-        async with anyio.create_task_group() as tg:
-            tg.start_soon(self._read_loop)
-
-    async def _read_loop(self) -> None:
+        import sys
         while True:
-            raw = await anyio.to_thread.run_sync(input)
-            if not raw:
+            try:
+                line = await anyio.to_thread.run_sync(sys.stdin.readline)
+                if not line:
+                    break
+                line = line.strip()
+                if not line:
+                    continue
+                message = json.loads(line)
+                response = await self.handle(message)
+                sys.stdout.write(json.dumps(response) + "\n")
+                sys.stdout.flush()
+            except (EOFError, KeyboardInterrupt):
+                break
+            except json.JSONDecodeError:
                 continue
-            message = json.loads(raw)
-            response = await self.handle(message)
-            print(json.dumps(response), flush=True)
+            except Exception as e:
+                error_response = {
+                    "jsonrpc": "2.0",
+                    "id": message.get("id") if "message" in locals() else None,
+                    "error": {"code": -32603, "message": str(e)}
+                }
+                sys.stdout.write(json.dumps(error_response) + "\n")
+                sys.stdout.flush()
 

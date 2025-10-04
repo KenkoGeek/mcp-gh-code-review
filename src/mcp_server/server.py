@@ -125,7 +125,7 @@ class MCPServer:
         ).model_dump()
 
     async def serve_stdio(self) -> None:
-        server = JSONRPCServer(self.jsonrpc_handlers())
+        server = JSONRPCServer(self.jsonrpc_handlers(), schemas=self.schemas())
         await server.serve_stdio()
 
     def schemas(self) -> dict[str, dict[str, Any]]:
