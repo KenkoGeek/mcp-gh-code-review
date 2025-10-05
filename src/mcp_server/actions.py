@@ -47,6 +47,11 @@ class GitHubClient:
     def post(self, path: str, payload: dict | None = None) -> httpx.Response:
         response = self._client.post(f"{self.base_url}{path}", json=payload)
         self._update_rate_limits(response)
+        if not response.is_success:
+            logger.error("github_api_error", 
+                        method="POST", path=path, 
+                        status=response.status_code, 
+                        response=response.text[:500])
         response.raise_for_status()
         return response
 
@@ -107,6 +112,17 @@ class ActionExecutor:
             try:
                 self._apply_action(action)
                 results.append(ActionResult(action=action, success=True))
+            except httpx.HTTPStatusError as exc:  # pragma: no cover - network errors
+                # Handle 422 errors specifically for pending review conflicts
+                if exc.response.status_code == 422:
+                    error_detail = "Error: Must resolve pending review before performing this action"
+                else:
+                    # Extract actual API response for other errors
+                    try:
+                        error_detail = f"HTTP {exc.response.status_code}: {exc.response.text}"
+                    except Exception:
+                        error_detail = str(exc)
+                results.append(ActionResult(action=action, success=False, detail=error_detail))
             except httpx.HTTPError as exc:  # pragma: no cover - network errors
                 results.append(ActionResult(action=action, success=False, detail=str(exc)))
         return results

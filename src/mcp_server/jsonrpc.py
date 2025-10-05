@@ -101,10 +101,20 @@ class JSONRPCServer:
                 sys.stdout.flush()
                 continue
             except Exception as e:
+                # Capture more detailed error information
+                import traceback
+                error_detail = f"{type(e).__name__}: {str(e)}"
+                if hasattr(e, '__cause__') and e.__cause__:
+                    error_detail += f" (caused by: {type(e.__cause__).__name__}: {str(e.__cause__)})"
+                
                 error_response = {
                     "jsonrpc": "2.0",
                     "id": message.get("id") if "message" in locals() else None,
-                    "error": {"code": -32603, "message": str(e)}
+                    "error": {
+                        "code": -32603, 
+                        "message": error_detail,
+                        "data": traceback.format_exc()[-1000:]  # Last 1000 chars of traceback
+                    }
                 }
                 sys.stdout.write(json.dumps(error_response) + "\n")
                 sys.stdout.flush()
