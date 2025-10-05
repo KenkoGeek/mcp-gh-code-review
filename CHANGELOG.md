@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.0.0...v1.1.0) (2025-10-05)
+
+
+### Features
+
+* **issues:** add review_issue and reply_to_issue_comment tools ([#9](https://github.com/KenkoGeek/mcp-gh-code-review/issues/9)) ([2fb66a7](https://github.com/KenkoGeek/mcp-gh-code-review/commit/2fb66a7b150f5e1f26a3c9406ce2154614f114a8))
+
 # 1.0.0 (2025-10-05)
 
 
