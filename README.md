@@ -142,7 +142,27 @@ docker run -p 8000:8000 \
 | `submit_pending_review` | Submit pending reviews with specified event type |
 | `health` | Check server status and GitHub API rate limits |
 
+## Example Prompts
 
+**For code reviews:**
+- "Review PR #15 and suggest improvements"
+- "Analyze the changes in PR #23 and check for security issues"
+- "What are the unresolved comments in PR #8?"
+
+**For responding to reviews:**
+- "Reply to all unresolved comments in PR #12"
+- "Respond to the inline comment about error handling"
+- "Address the feedback from @reviewer in PR #5"
+
+**For managing reviews:**
+- "Submit my pending review as APPROVE"
+- "Get the status of all review threads in PR #20"
+- "Check if there are any blocking comments"
+
+The MCP server automatically:
+- Detects bot comments (won't reply to dependabot)
+- Identifies your own comments (won't reply to yourself)
+- Provides context-aware guidance for responses
 
 ## Development
 
