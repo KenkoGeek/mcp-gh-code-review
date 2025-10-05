@@ -11,7 +11,7 @@ logger = structlog.get_logger(__name__)
 
 
 class GitHubGraphQLClient:
-    """GitHub GraphQL API client for pending reviews."""
+    """GitHub GraphQL API client for pending reviews and review threads."""
     
     def __init__(self, token: str):
         self.token = token
@@ -127,6 +127,46 @@ class GitHubGraphQLClient:
             "success": True,
             "review": result["data"]["submitPullRequestReview"]["pullRequestReview"]
         }
+    
+    async def get_review_threads(self, owner: str, repo: str, pr_number: int) -> dict[str, Any]:
+        """Get review threads with isResolved status."""
+        query = """
+        query($owner: String!, $repo: String!, $number: Int!) {
+          repository(owner: $owner, name: $repo) {
+            pullRequest(number: $number) {
+              reviewThreads(first: 100) {
+                nodes {
+                  id
+                  isResolved
+                  comments(first: 20) {
+                    nodes {
+                      id
+                      databaseId
+                      body
+                      path
+                      line
+                      author {
+                        login
+                      }
+                      createdAt
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+        
+        variables = {"owner": owner, "repo": repo, "number": pr_number}
+        result = await self.query(query, variables)
+        
+        if "errors" in result:
+            logger.error("graphql_error", errors=result["errors"])
+            return {"error": result["errors"]}
+        
+        threads = result["data"]["repository"]["pullRequest"]["reviewThreads"]["nodes"]
+        return {"threads": threads, "count": len(threads)}
 
 
 __all__ = ["GitHubGraphQLClient"]

@@ -11,3 +11,5 @@ package-lock.json
 *.egg-info/
 dist/
 .amazonq/
+*_cache/
+.DS_Store

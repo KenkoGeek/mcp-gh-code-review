@@ -178,6 +178,14 @@ class ManagePendingReviewResponse(BaseModel):
     message: str | None = None
 
 
+class SubmitPendingReviewRequest(BaseModel):
+    """Request to submit pending review."""
+    pr_number: int
+    review_id: str
+    event: str  # APPROVE, REQUEST_CHANGES, COMMENT
+    body: str = ""
+
+
 def schema_for(model: type[BaseModel]) -> dict:
     """Return JSON schema for a model."""
 
@@ -210,5 +218,6 @@ __all__ = [
     "HealthResponse",
     "ManagePendingReviewRequest",
     "ManagePendingReviewResponse",
+    "SubmitPendingReviewRequest",
     "schema_for",
 ]
