@@ -9,6 +9,7 @@ import httpx
 import structlog
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from .comment_classifier import CommentClassifier, CommentType
 from .config import GitHubConfig
 from .schemas import Action, ActionResult, ActionType
 
@@ -83,6 +84,24 @@ class GitHubClient:
 @dataclass(slots=True)
 class ActionExecutor:
     client: GitHubClient
+    comment_classifier: CommentClassifier = field(default_factory=CommentClassifier)
+    
+    def _get_commit_id(self, pr: dict, in_reply_to: int | None = None) -> str | None:
+        """Get commit_id for review comment."""
+        try:
+            if in_reply_to:
+                # Get commit_id from original comment
+                comment_path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/comments/{in_reply_to}"
+                response = self.client.get(comment_path)
+                return response.json().get("commit_id")
+            else:
+                # Get HEAD commit from PR
+                pr_path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}"
+                response = self.client.get(pr_path)
+                return response.json()["head"]["sha"]
+        except Exception as e:
+            logger.warning("failed_to_get_commit_id", error=str(e), in_reply_to=in_reply_to)
+            return None
     
     def _validate_pr_metadata(self, pr: dict) -> bool:
         """Validate PR metadata to prevent path traversal."""
@@ -92,7 +111,7 @@ class ActionExecutor:
         
         # Validate owner and repo are safe strings
         import re
-        safe_pattern = re.compile(r'^[a-zA-Z0-9._-]+$')
+        safe_pattern = re.compile(r'^[a-zA-Z0-9_]+$')
         if not safe_pattern.match(str(pr['owner'])) or not safe_pattern.match(str(pr['repo'])):
             return False
         
@@ -142,7 +161,7 @@ class ActionExecutor:
                 if "in_reply_to" in action.metadata:
                     # Reply to inline comment (review comment)
                     path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/comments"
-                    payload["in_reply_to"] = str(action.metadata["in_reply_to"])
+                    payload["in_reply_to"] = int(action.metadata["in_reply_to"])
                 else:
                     # General PR comment
                     path = f"/repos/{pr['owner']}/{pr['repo']}/issues/{pr['number']}/comments"
@@ -150,16 +169,36 @@ class ActionExecutor:
         elif action.type == ActionType.add_review_comment and action.metadata:
             pr = action.metadata.get("pr")
             if pr:
-                # Add comment to pending review or create new review
-                path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/comments"
-                payload = {
-                    "body": action.value,
-                    "commit_id": action.metadata.get("commit_id"),
+                # Use classifier to determine correct approach
+                comment_data = {
                     "path": action.metadata.get("path"),
-                    "line": action.metadata.get("line")
+                    "line": action.metadata.get("line"),
+                    "diff_hunk": action.metadata.get("diff_hunk"),
+                    "in_reply_to_id": action.metadata.get("in_reply_to")
                 }
-                if "in_reply_to" in action.metadata:
-                    payload["in_reply_to"] = str(action.metadata["in_reply_to"])
+                
+                metadata = self.comment_classifier.classify_comment(comment_data, pr["number"])
+                
+                # Validate metadata
+                errors = self.comment_classifier.validate_metadata(metadata)
+                if errors:
+                    logger.error("invalid_comment_metadata", errors=errors, metadata=metadata)
+                    return
+                
+                # Get API endpoint and payload
+                endpoint = self.comment_classifier.get_api_endpoint(metadata)
+                path = endpoint.format(owner=pr["owner"], repo=pr["repo"])
+                payload = self.comment_classifier.get_request_payload(metadata, action.value)
+                
+                # Auto-detect commit_id if needed
+                if metadata.requires_commit_id and not payload.get("commit_sha"):
+                    commit_id = self._get_commit_id(pr)
+                    if commit_id:
+                        payload["commit_sha"] = commit_id
+                    else:
+                        logger.error("missing_commit_id", pr=pr)
+                        return
+                
                 self.client.post(path, payload=payload)
         elif action.type == ActionType.reply_to_pending_review and action.metadata:
             pr = action.metadata.get("pr")

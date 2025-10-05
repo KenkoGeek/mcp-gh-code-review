@@ -4,7 +4,7 @@
   "description": "MCP server for managing GitHub pull request reviews",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/mcp-gh-code-review.git"
+    "url": "https://github.com/KenkoGeek/mcp-gh-code-review.git"
   },
   "license": "MIT",
   "private": true,

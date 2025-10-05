@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .comment_classifier import CommentClassifier, CommentType
+
 
 @dataclass(slots=True)
 class PRReviewResult:
@@ -19,6 +21,7 @@ class PROrchestrator:
     
     def __init__(self, server):
         self.server = server
+        self.comment_classifier = CommentClassifier()
     
     async def review_pr(
         self, pr_number: int, owner: str, repo: str, include_all: bool = True
@@ -93,16 +96,49 @@ class PROrchestrator:
         
         # Priority responses needed
         for response in analysis.get("priority_responses", []):
+            # Classify comment to determine correct API approach
+            comment_data = {
+                "id": response["comment_id"],
+                "path": response.get("path"),
+                "line": response.get("line"),
+                "diff_hunk": response.get("diff_hunk"),
+                "in_reply_to_id": response.get("in_reply_to_id")
+            }
+            
+            metadata = self.comment_classifier.classify_comment(comment_data, pr_number)
+            
+            # Build action based on comment type
+            if metadata.comment_type == CommentType.REVIEW_COMMENT:
+                action_type = "add_review_comment"
+                action_metadata = {
+                    "pr_number": pr_number,
+                    "path": metadata.path,
+                    "line": metadata.line,
+                    "commit_id": metadata.commit_id
+                }
+            elif metadata.comment_type == CommentType.REVIEW_COMMENT_REPLY:
+                action_type = "add_review_comment"
+                action_metadata = {
+                    "pr_number": pr_number,
+                    "in_reply_to": metadata.in_reply_to
+                }
+            else:
+                action_type = "comment"
+                action_metadata = {
+                    "pr_number": pr_number
+                }
+            
             actions.append({
                 "type": "respond_to_comment",
                 "priority": "high",
                 "comment_id": response["comment_id"],
-                "path": response["path"],
-                "line": response["line"],
+                "comment_type": metadata.comment_type.value,
+                "path": response.get("path"),
+                "line": response.get("line"),
                 "participants": response["participants"],
                 "suggested_action": {
-                    "type": "comment",
-                    "metadata": {"pr_number": pr_number, "in_reply_to": str(response["comment_id"])}
+                    "type": action_type,
+                    "metadata": action_metadata
                 }
             })
         

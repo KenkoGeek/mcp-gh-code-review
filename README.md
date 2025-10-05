@@ -10,7 +10,7 @@ A production-focused Model Context Protocol (MCP) server for automating GitHub p
 - **Idempotent Storage** - SQLite-backed thread mappings for retry safety
 - **Policy Engine** - YAML-driven triage rules for labels, assignments, and automation
 - **Production Ready** - Structured logging, error handling, rate limit tracking, dry-run mode
-- **Modern Python** - Uses match/case patterns, type hints, and Python 3.10+ features
+- **Modern Python** - Uses match/case patterns, type hints, and Python 3.11+ features
 - **Comprehensive Tests** - 14 tests covering all core functionality
 
 ## Quick Start
@@ -18,7 +18,7 @@ A production-focused Model Context Protocol (MCP) server for automating GitHub p
 ### Installation
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/KenkoGeek/mcp-gh-code-review.git
 cd mcp-gh-code-review
 python -m venv .venv
 source .venv/bin/activate
@@ -258,13 +258,7 @@ python -m mcp_server.cli --stdio
 
 ## Contributing
 
-See [IMPROVEMENTS.md](IMPROVEMENTS.md) for recent enhancements.
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Ensure all tests pass: `pytest`
-5. Submit a pull request
+[Check here](CONTRIBUTING.md)
 
 ## License
 

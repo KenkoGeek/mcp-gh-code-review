@@ -12,7 +12,7 @@
 
 ### How to Report
 
-Email security concerns to: **ops@example.com**
+Email security concerns to: **info@kenkogeek.com**
 
 Include:
 - Description of the vulnerability

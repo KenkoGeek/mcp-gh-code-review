@@ -3,7 +3,7 @@ ENV PYTHONUNBUFFERED=1
 RUN groupadd -r app && useradd -r -g app app
 WORKDIR /app
 
-COPY pyproject.toml README.md LICENSE ./
+COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 
