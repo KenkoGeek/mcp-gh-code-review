@@ -33,7 +33,19 @@ cp .env.example .env
 ```
 
 **Required:**
-- `GITHUB_TOKEN` - GitHub personal access token or app credentials
+- `GITHUB_TOKEN` - GitHub personal access token with minimal permissions (see below)
+
+**GitHub Token Permissions:**
+
+*Fine-grained Personal Access Token (Recommended):*
+- **Repository permissions:**
+  - `pull_requests: write` - Create/update PR comments and reviews
+  - `issues: write` - Add comments to PR discussions
+  - `metadata: read` - Read basic repository information
+  - `contents: read` - Access repository files and structure
+
+*Personal Access Token (Classic):*
+- `repo` scope - Full repository access
 
 **Optional:**
 - `BOT_ACTORS` - Comma-separated bot patterns (extends defaults)

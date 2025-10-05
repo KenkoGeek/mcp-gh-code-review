@@ -4,6 +4,7 @@ __pycache__/
 .mcp/
 .env
 .coverage
+coverage.xml
 htmlcov/
 *.egg-info/
 .amazonq/

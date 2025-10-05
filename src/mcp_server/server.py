@@ -6,10 +6,14 @@ from collections.abc import Awaitable, Callable
 from dataclasses import asdict, dataclass
 from typing import Any
 
+import structlog
+
 from .actions import ActionExecutor, GitHubClient
 from .classifier import ActorClassifier
 from .config import PolicyConfig, ServerConfig, load_policy
+from .graphql_client import GitHubGraphQLClient
 from .jsonrpc import JSONRPCServer
+from .orchestrator import PROrchestrator
 from .responder import Responder
 from .schemas import (
     ActionType,
@@ -26,16 +30,13 @@ from .schemas import (
     TriageEventRequest,
     schema_for,
 )
-import structlog
 
 # Context schemas imported dynamically to avoid circular imports
 from .storage import Storage
-
-logger = structlog.get_logger(__name__)
 from .thread_manager import ThreadManager
 from .triage import TriageEngine
-from .orchestrator import PROrchestrator
-from .graphql_client import GitHubGraphQLClient
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -125,19 +126,30 @@ class MCPServer:
         context = self._auto_detect_context()
         if "error" not in context:
             # Get PR number from first action or default to 1
-            pr_number = next((action.metadata.get("pr_number") for action in request.actions if "pr_number" in action.metadata), 1)
+            pr_number = next(
+                (action.metadata.get("pr_number") for action in request.actions 
+                 if "pr_number" in action.metadata), 1
+            )
             
             # Check for pending reviews and optimize action types
             try:
-                pr_data = await self.get_pr_data({"pr_number": pr_number, "include": ["pending_reviews"]})
-                has_pending_review = "pending_reviews" in pr_data and pr_data["pending_reviews"]["count"] > 0
+                pr_data = await self.get_pr_data({
+                    "pr_number": pr_number, 
+                    "include": ["pending_reviews"]
+                })
+                has_pending_review = (
+                    "pending_reviews" in pr_data and 
+                    pr_data["pending_reviews"]["count"] > 0
+                )
             except Exception as e:
                 logger.warning("failed_to_check_pending_reviews", error=str(e))
                 has_pending_review = False
             
             # Add PR context and optimize action types
             for action in request.actions:
-                if action.type in [ActionType.comment, ActionType.apply_label, ActionType.add_review_comment] and "pr" not in action.metadata:
+                if (action.type in [ActionType.comment, ActionType.apply_label, 
+                                   ActionType.add_review_comment] and 
+                    "pr" not in action.metadata):
                     action.metadata["pr"] = {
                         "owner": context["owner"],
                         "repo": context["repo"],
@@ -614,13 +626,8 @@ class MCPServer:
         await server.serve_stdio()
 
     def schemas(self) -> dict[str, dict[str, Any]]:
-        from .context_schemas import (
-            FetchPRInfoRequest,
-            GetPRDataRequest,
-            AnalyzePRReviewsRequest,
-        )
-        from .review_schemas import ReviewPRRequest
         from .pending_reviews_schemas import SubmitPendingReviewRequest
+        from .review_schemas import ReviewPRRequest
         return {
             "review_pr": schema_for(ReviewPRRequest),
             "apply_actions": schema_for(ApplyActionsRequest),

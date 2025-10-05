@@ -1,10 +1,28 @@
+# Auto-label based on file paths
 labels:
+  src/frontend/: [frontend, ui]
+  src/backend/: [backend, api]
+  tests/: [testing]
+  docs/: [documentation]
   src/: ["area-core"]
-  docs/: ["area-docs"]
+
+# Auto-assign reviewers by path
 owners:
+  src/auth/: [security-team]
+  src/database/: [db-team]
   src/: ["core-team"]
+
+# Paths that can be auto-approved
 auto_approve_paths:
   - docs/
+  - README.md
+  - "*.md"
+
+# Protected paths requiring specific reviewers
 protected_paths:
+  src/security/: [security-lead]
+  config/production/: [ops-team]
   infra/: ["platform-team"]
+
+# SLA for review responses (hours)
 sla_hours: 24

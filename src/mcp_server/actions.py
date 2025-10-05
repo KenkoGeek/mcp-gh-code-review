@@ -37,7 +37,11 @@ class GitHubClient:
             self.rate_limit_remaining = int(response.headers["X-RateLimit-Remaining"])
         if "X-RateLimit-Reset" in response.headers:
             self.rate_limit_reset = int(response.headers["X-RateLimit-Reset"])
-        logger.debug("rate_limit_updated", remaining=self.rate_limit_remaining, reset=self.rate_limit_reset)
+        logger.debug(
+            "rate_limit_updated", 
+            remaining=self.rate_limit_remaining, 
+            reset=self.rate_limit_reset
+        )
 
     @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3))
     def post(self, path: str, payload: dict | None = None) -> httpx.Response:
@@ -69,6 +73,11 @@ class GitHubClient:
 
     def close(self) -> None:
         self._client.close()
+
+
+@dataclass(slots=True)
+class ActionExecutor:
+    client: GitHubClient
     
     def _validate_pr_metadata(self, pr: dict) -> bool:
         """Validate PR metadata to prevent path traversal."""
@@ -88,11 +97,6 @@ class GitHubClient:
             return num > 0
         except (ValueError, TypeError):
             return False
-
-
-@dataclass(slots=True)
-class ActionExecutor:
-    client: GitHubClient
 
     def apply(self, actions: Iterable[Action], dry_run: bool = False) -> list[ActionResult]:
         results: list[ActionResult] = []
@@ -153,7 +157,10 @@ class ActionExecutor:
                 pending_review = next((r for r in reviews if r["state"] == "PENDING"), None)
                 if pending_review:
                     # Submit the pending review with our reply as a comment
-                    submit_path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/reviews/{pending_review['id']}/events"
+                    submit_path = (
+                        f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/"
+                        f"reviews/{pending_review['id']}/events"
+                    )
                     payload = {
                         "event": "COMMENT",
                         "body": action.value
@@ -179,7 +186,10 @@ class ActionExecutor:
             review_id = action.metadata.get("review_id")
             if pr and review_id:
                 # Dismiss a review
-                path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/reviews/{review_id}/dismissals"
+                path = (
+                    f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/"
+                    f"reviews/{review_id}/dismissals"
+                )
                 payload = {"message": action.value or "Review dismissed"}
                 self.client.put(path, payload=payload)
         elif action.type == ActionType.rerun_checks and action.metadata:

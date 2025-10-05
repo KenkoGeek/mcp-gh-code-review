@@ -7,8 +7,6 @@ from dataclasses import dataclass
 import structlog
 
 from .classifier import ActorClassifier
-
-logger = structlog.get_logger(__name__)
 from .config import PolicyConfig
 from .schemas import (
     Action,
@@ -21,6 +19,8 @@ from .schemas import (
     StatusState,
     TriagedActions,
 )
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(slots=True)
