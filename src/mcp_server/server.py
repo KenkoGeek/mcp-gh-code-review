@@ -55,6 +55,10 @@ class MCPServer:
         pr_number = params["pr_number"]
         owner, repo = self._get_repo()
         
+        # Get authenticated user
+        user_response = self.client.get("/user")
+        authenticated_user = user_response.json()["login"]
+        
         # GraphQL: threads with isResolved
         threads_data = await self.graphql.get_review_threads(owner, repo, pr_number)
         
@@ -62,19 +66,22 @@ class MCPServer:
         pr_response = self.client.get(f"/repos/{owner}/{repo}/pulls/{pr_number}")
         reviews_response = self.client.get(f"/repos/{owner}/{repo}/pulls/{pr_number}/reviews")
         
-        # Annotate threads with bot detection
+        # Annotate threads with bot detection and own comment detection
         threads = threads_data.get("threads", [])
         for thread in threads:
             for comment in thread.get("comments", {}).get("nodes", []):
                 author = comment.get("author", {})
                 if author:
-                    author["is_bot"] = is_bot(author.get("login", ""))
+                    login = author.get("login", "")
+                    author["is_bot"] = is_bot(login)
+                    author["is_me"] = login == authenticated_user
         
         return {
             "pr_info": pr_response.json(),
             "reviews": reviews_response.json(),
             "threads": threads,
-            "threads_count": threads_data.get("count", 0)
+            "threads_count": threads_data.get("count", 0),
+            "authenticated_user": authenticated_user
         }
     
     async def reply_to_comment(self, params: dict[str, Any]) -> dict[str, Any]:
