@@ -19,6 +19,14 @@ A production-focused Model Context Protocol (MCP) server for automating GitHub p
 
 ### Installation
 
+**Using uvx (recommended - no installation required):**
+
+```bash
+uvx --from git+https://github.com/KenkoGeek/mcp-gh-code-review mcp_server.cli --stdio
+```
+
+**Or install locally:**
+
 ```bash
 git clone https://github.com/KenkoGeek/mcp-gh-code-review.git
 cd mcp-gh-code-review
@@ -59,6 +67,28 @@ cp .env.example .env
 Connect from Claude Desktop, IDEs, or any MCP-compatible client.
 
 **Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+
+**Option A: Using uvx (recommended):**
+```json
+{
+  "mcpServers": {
+    "github-review": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/KenkoGeek/mcp-gh-code-review",
+        "mcp_server.cli",
+        "--stdio"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "ghp_your_token_here"
+      }
+    }
+  }
+}
+```
+
+**Option B: Using local installation:**
 ```json
 {
   "mcpServers": {
