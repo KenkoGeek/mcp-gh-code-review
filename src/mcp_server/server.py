@@ -20,7 +20,7 @@ logger = structlog.get_logger(__name__)
 
 @dataclass(slots=True)
 class MCPServer:
-    """MCP server with 4 tools: review_pr, reply, get_threads, submit_review."""
+    """MCP server with 8 tools: 5 PR + 3 issues + health."""
     
     token: str
     client: GitHubClient
@@ -131,6 +131,109 @@ class MCPServer:
             owner, repo, request.pr_number, request.review_id, request.event, request.body
         )
     
+    async def list_issues(self, params: dict[str, Any]) -> dict[str, Any]:
+        """List all issues (excluding PRs)."""
+        owner, repo = self._get_repo()
+        state = params.get("state", "open")  # open, closed, all
+        
+        logger.info("list_issues_start", owner=owner, repo=repo, state=state)
+        
+        try:
+            # Get all issues (includes PRs)
+            response = self.client.get(f"/repos/{owner}/{repo}/issues?state={state}&per_page=100")
+            all_items = response.json()
+            
+            # Filter out PRs - only keep real issues
+            issues = [
+                item for item in all_items 
+                if "pull_request" not in item or item["pull_request"] is None
+            ]
+            
+            logger.info("list_issues_complete", count=len(issues), state=state)
+            return {"issues": issues, "count": len(issues)}
+        except Exception as e:
+            logger.error("list_issues_failed", error=str(e))
+            raise
+    
+    async def review_issue(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Get issue with comments."""
+        issue_number = params["issue_number"]
+        if issue_number <= 0:
+            raise ValueError("issue_number must be a positive integer")
+        
+        owner, repo = self._get_repo()
+        logger.info("review_issue_start", issue_number=issue_number, owner=owner, repo=repo)
+        
+        try:
+            # Get authenticated user
+            user_response = self.client.get("/user")
+            authenticated_user = user_response.json()["login"]
+            
+            # Get issue + comments
+            issue_response = self.client.get(f"/repos/{owner}/{repo}/issues/{issue_number}")
+            comments_response = self.client.get(f"/repos/{owner}/{repo}/issues/{issue_number}/comments")
+        except Exception as e:
+            logger.error("review_issue_failed", issue_number=issue_number, error=str(e))
+            raise
+        
+        issue_data = issue_response.json()
+        
+        # GitHub /issues endpoint returns both issues and PRs
+        # Reject PRs - only accept real issues
+        if "pull_request" in issue_data and issue_data["pull_request"] is not None:
+            raise ValueError(f"#{issue_number} is a pull request, not an issue. Use review_pr instead.")
+        
+        comments = comments_response.json()
+        
+        # Annotate comments with bot detection and own comment detection
+        for comment in comments:
+            user = comment.get("user", {})
+            if user:
+                login = user.get("login", "")
+                user["is_bot"] = is_bot(login)
+                user["is_me"] = login == authenticated_user
+        
+        logger.info(
+            "review_issue_complete",
+            issue_number=issue_number,
+            comments_count=len(comments),
+            authenticated_user=authenticated_user,
+        )
+        return {
+            "issue": issue_data,
+            "comments": comments,
+            "authenticated_user": authenticated_user,
+            "_guidance": (
+                "When replying: "
+                "is_bot=true → short replies (1-2 lines, e.g. \"Thanks for the update\"), "
+                "is_bot=false → detailed replies, "
+                "is_me=true → skip (your own comments)"
+            )
+        }
+    
+    async def reply_to_issue_comment(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Reply to issue comment."""
+        issue_number = params["issue_number"]
+        reply_text = params["reply_text"]
+        
+        if not reply_text or not reply_text.strip():
+            raise ValueError("reply_text cannot be empty or whitespace")
+        
+        owner, repo = self._get_repo()
+        logger.info("reply_to_issue_comment", issue_number=issue_number, owner=owner, repo=repo)
+        
+        try:
+            path = f"/repos/{owner}/{repo}/issues/{issue_number}/comments"
+            payload = {"body": reply_text}
+            
+            response = self.client.post(path, payload=payload)
+            response.raise_for_status()
+            logger.info("reply_to_issue_comment_success", issue_number=issue_number)
+            return {"success": True}
+        except Exception as e:
+            logger.error("reply_to_issue_comment_failed", issue_number=issue_number, error=str(e))
+            raise
+    
     async def health(self, params: dict[str, Any]) -> dict[str, Any]:
         """Health check."""
         return {
@@ -148,6 +251,9 @@ class MCPServer:
             "reply_to_comment": self._wrap(self.reply_to_comment),
             "get_review_threads": self._wrap(self.get_review_threads),
             "submit_pending_review": self._wrap(self.submit_pending_review),
+            "list_issues": self._wrap(self.list_issues),
+            "review_issue": self._wrap(self.review_issue),
+            "reply_to_issue_comment": self._wrap(self.reply_to_issue_comment),
             "health": self._wrap(self.health),
         }
     
@@ -181,6 +287,25 @@ class MCPServer:
                 "required": ["pr_number"]
             },
             "submit_pending_review": schema_for(SubmitPendingReviewRequest),
+            "list_issues": {
+                "type": "object",
+                "properties": {
+                    "state": {"type": "string", "enum": ["open", "closed", "all"]}
+                }
+            },
+            "review_issue": {
+                "type": "object",
+                "properties": {"issue_number": {"type": "integer"}},
+                "required": ["issue_number"]
+            },
+            "reply_to_issue_comment": {
+                "type": "object",
+                "properties": {
+                    "issue_number": {"type": "integer"},
+                    "reply_text": {"type": "string"}
+                },
+                "required": ["issue_number", "reply_text"]
+            },
             "health": {"type": "object", "properties": {}}
         }
     

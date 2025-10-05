@@ -9,7 +9,7 @@ A production-focused Model Context Protocol (MCP) server for automating GitHub p
 
 ## Features
 
-- **5 JSON-RPC Tools** - PR review, inline comment replies, review threads, pending reviews, health checks
+- **8 JSON-RPC Tools** - 5 PR tools + 3 issue tools + health check
 - **Webhook Integration** - FastAPI endpoint with GitHub signature verification
 - **13 Tests** - Comprehensive test coverage including error handling and security
 - **Structured Logging** - JSON logs with rate limit tracking and error context
@@ -164,30 +164,40 @@ docker run -p 8000:8000 \
 
 ## Available Tools
 
+### Pull Request Tools
 | Tool | Description |
 |------|-------------|
 | `review_pr` | Comprehensive PR analysis with reviews, comments, and threads |
 | `reply_to_comment` | Reply to inline PR comments using databaseId |
 | `get_review_threads` | Get review threads with isResolved status via GraphQL |
 | `submit_pending_review` | Submit pending reviews with specified event type |
+
+### Issue Tools
+| Tool | Description |
+|------|-------------|
+| `list_issues` | List all repository issues (filters out PRs automatically) |
+| `review_issue` | Get issue details with comments and bot/user annotations |
+| `reply_to_issue_comment` | Reply to issue comments |
+
+### System Tools
+| Tool | Description |
+|------|-------------|
 | `health` | Check server status and GitHub API rate limits |
 
 ## Example Prompts
 
-**For code reviews:**
+**For pull request reviews:**
 - "Review PR #15 and suggest improvements"
 - "Analyze the changes in PR #23 and check for security issues"
 - "What are the unresolved comments in PR #8?"
-
-**For responding to reviews:**
 - "Reply to all unresolved comments in PR #12"
-- "Respond to the inline comment about error handling"
-- "Address the feedback from @reviewer in PR #5"
-
-**For managing reviews:**
 - "Submit my pending review as APPROVE"
-- "Get the status of all review threads in PR #20"
-- "Check if there are any blocking comments"
+
+**For issue management:**
+- "List all open issues in the repository"
+- "Review issue #10 and provide feedback"
+- "Reply to issue #5 with a status update"
+- "Show me all closed issues"
 
 The MCP server automatically:
 - Detects bot comments (won't reply to dependabot)
