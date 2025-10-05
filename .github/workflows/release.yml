@@ -28,6 +28,10 @@ jobs:
   codeql:
     uses: ./.github/workflows/codeql.yml
     secrets: inherit
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
 
   # Release only after all checks pass
   release:
