@@ -20,7 +20,7 @@ logger = structlog.get_logger(__name__)
 
 @dataclass(slots=True)
 class MCPServer:
-    """MCP server with 4 tools: review_pr, reply, get_threads, submit_review."""
+    """MCP server with 7 tools: 5 PR + 2 issues + health."""
     
     token: str
     client: GitHubClient
@@ -134,16 +134,23 @@ class MCPServer:
     async def review_issue(self, params: dict[str, Any]) -> dict[str, Any]:
         """Get issue with comments."""
         issue_number = params["issue_number"]
+        if issue_number <= 0:
+            raise ValueError("issue_number must be a positive integer")
+        
         owner, repo = self._get_repo()
         logger.info("review_issue_start", issue_number=issue_number, owner=owner, repo=repo)
         
-        # Get authenticated user
-        user_response = self.client.get("/user")
-        authenticated_user = user_response.json()["login"]
-        
-        # Get issue + comments
-        issue_response = self.client.get(f"/repos/{owner}/{repo}/issues/{issue_number}")
-        comments_response = self.client.get(f"/repos/{owner}/{repo}/issues/{issue_number}/comments")
+        try:
+            # Get authenticated user
+            user_response = self.client.get("/user")
+            authenticated_user = user_response.json()["login"]
+            
+            # Get issue + comments
+            issue_response = self.client.get(f"/repos/{owner}/{repo}/issues/{issue_number}")
+            comments_response = self.client.get(f"/repos/{owner}/{repo}/issues/{issue_number}/comments")
+        except Exception as e:
+            logger.error("review_issue_failed", issue_number=issue_number, error=str(e))
+            raise
         
         issue_data = issue_response.json()
         comments = comments_response.json()
@@ -168,7 +175,7 @@ class MCPServer:
             "authenticated_user": authenticated_user,
             "_guidance": (
                 "When replying: "
-                "is_bot=true → short replies (1-2 lines, e.g. 'Thanks for the update'), "
+                "is_bot=true → short replies (1-2 lines, e.g. \"Thanks for the update\"), "
                 "is_bot=false → detailed replies, "
                 "is_me=true → skip (your own comments)"
             )
@@ -178,16 +185,24 @@ class MCPServer:
         """Reply to issue comment."""
         issue_number = params["issue_number"]
         reply_text = params["reply_text"]
-        owner, repo = self._get_repo()
         
+        if not reply_text or not reply_text.strip():
+            raise ValueError("reply_text cannot be empty or whitespace")
+        
+        owner, repo = self._get_repo()
         logger.info("reply_to_issue_comment", issue_number=issue_number, owner=owner, repo=repo)
         
-        path = f"/repos/{owner}/{repo}/issues/{issue_number}/comments"
-        payload = {"body": reply_text}
-        
-        self.client.post(path, payload=payload)
-        logger.info("reply_to_issue_comment_success", issue_number=issue_number)
-        return {"success": True}
+        try:
+            path = f"/repos/{owner}/{repo}/issues/{issue_number}/comments"
+            payload = {"body": reply_text}
+            
+            response = self.client.post(path, payload=payload)
+            response.raise_for_status()
+            logger.info("reply_to_issue_comment_success", issue_number=issue_number)
+            return {"success": True}
+        except Exception as e:
+            logger.error("reply_to_issue_comment_failed", issue_number=issue_number, error=str(e))
+            raise
     
     async def health(self, params: dict[str, Any]) -> dict[str, Any]:
         """Health check."""
