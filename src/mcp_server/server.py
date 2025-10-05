@@ -80,18 +80,18 @@ class MCPServer:
     def jsonrpc_handlers(self) -> dict[str, Callable[[dict[str, Any]], Awaitable[dict[str, Any]]]]:
         """Return JSON-RPC method handlers."""
         return {
-            # Core workflow - single entry point
+            # Core workflow
             "review_pr": self._wrap(self.review_pr),
             
-            # Essential actions
-            "apply_actions": self._wrap(self.apply_actions),
-            "generate_reply": self._wrap(self.generate_reply),
+            # Comment tools - specific for each type
+            "reply_to_inline_comment": self._wrap(self.reply_to_inline_comment),
+            "reply_to_general_comment": self._wrap(self.reply_to_general_comment),
+            "add_new_inline_comment": self._wrap(self.add_new_inline_comment),
             
-            # Pending reviews (GraphQL)
+            # Other tools
+            "generate_reply": self._wrap(self.generate_reply),
             "get_pending_reviews": self._wrap(self.get_pending_reviews),
             "submit_pending_review": self._wrap(self.submit_pending_review),
-            
-            # System management
             "health": self._wrap(self.health),
             "set_policy": self._wrap(self.set_policy),
         }
@@ -119,57 +119,94 @@ class MCPServer:
         response = self.responder.generate(request)
         return response.model_dump()
 
-    async def apply_actions(self, params: dict[str, Any]) -> dict[str, Any]:
-        request = ApplyActionsRequest.model_validate(params)
+    async def reply_to_inline_comment(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Reply to an inline comment (review comment)."""
+        pr_number = params.get("pr_number")
+        comment_id = params.get("comment_id")
+        reply_text = params.get("reply_text")
         
-        # Auto-detect PR context and add to actions that need it
+        if not all([pr_number, comment_id, reply_text]):
+            return {"error": "Missing pr_number, comment_id, or reply_text"}
+        
         context = self._auto_detect_context()
-        if "error" not in context:
-            # Get PR number from first action or default to 1
-            pr_number = next(
-                (action.metadata.get("pr_number") for action in request.actions 
-                 if "pr_number" in action.metadata), 1
-            )
-            
-            # Check for pending reviews and optimize action types
-            try:
-                pr_data = await self.get_pr_data({
-                    "pr_number": pr_number, 
-                    "include": ["pending_reviews"]
-                })
-                has_pending_review = (
-                    "pending_reviews" in pr_data and 
-                    pr_data["pending_reviews"]["count"] > 0
-                )
-            except Exception as e:
-                logger.warning("failed_to_check_pending_reviews", error=str(e))
-                has_pending_review = False
-            
-            # Add PR context and optimize action types
-            for action in request.actions:
-                if (action.type in [ActionType.comment, ActionType.apply_label, 
-                                   ActionType.add_review_comment] and 
-                    "pr" not in action.metadata):
-                    action.metadata["pr"] = {
-                        "owner": context["owner"],
-                        "repo": context["repo"],
-                        "number": pr_number
-                    }
-                
-                # Optimize comment actions based on pending review status
-                if action.type == ActionType.comment and has_pending_review:
-                    # If there's a pending review, use the special handler
-                    action.type = ActionType.reply_to_pending_review
+        if "error" in context:
+            return context
         
-        # Log action optimization for debugging
-        logger.info("optimized_actions", 
-                   action_types=[action.type.value for action in request.actions],
-                   has_pending_review=has_pending_review)
-        
-        results = self.action_executor.apply(
-            request.actions, dry_run=request.dry_run or self.config.dry_run
+        action = Action(
+            type=ActionType.add_review_comment,
+            value=reply_text,
+            metadata={
+                "pr": {
+                    "owner": context["owner"],
+                    "repo": context["repo"],
+                    "number": pr_number
+                },
+                "in_reply_to": str(comment_id)
+            }
         )
-        return ApplyActionsResponse(results=results).model_dump()
+        
+        results = self.action_executor.apply([action], dry_run=self.config.dry_run)
+        return {"success": results[0].success, "detail": results[0].detail}
+    
+    async def reply_to_general_comment(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Reply to a general PR comment."""
+        pr_number = params.get("pr_number")
+        reply_text = params.get("reply_text")
+        
+        if not all([pr_number, reply_text]):
+            return {"error": "Missing pr_number or reply_text"}
+        
+        context = self._auto_detect_context()
+        if "error" in context:
+            return context
+        
+        action = Action(
+            type=ActionType.comment,
+            value=reply_text,
+            metadata={
+                "pr": {
+                    "owner": context["owner"],
+                    "repo": context["repo"],
+                    "number": pr_number
+                }
+            }
+        )
+        
+        results = self.action_executor.apply([action], dry_run=self.config.dry_run)
+        return {"success": results[0].success, "detail": results[0].detail}
+    
+    async def add_new_inline_comment(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Add a new inline comment to specific file/line."""
+        pr_number = params.get("pr_number")
+        comment_text = params.get("comment_text")
+        file_path = params.get("file_path")
+        line_number = params.get("line_number")
+        
+        if not all([pr_number, comment_text, file_path, line_number]):
+            return {"error": "Missing pr_number, comment_text, file_path, or line_number"}
+        
+        context = self._auto_detect_context()
+        if "error" in context:
+            return context
+        
+        action = Action(
+            type=ActionType.add_review_comment,
+            value=comment_text,
+            metadata={
+                "pr": {
+                    "owner": context["owner"],
+                    "repo": context["repo"],
+                    "number": pr_number
+                },
+                "path": file_path,
+                "line": line_number
+            }
+        )
+        
+        results = self.action_executor.apply([action], dry_run=self.config.dry_run)
+        return {"success": results[0].success, "detail": results[0].detail}
+
+
 
     async def map_inline_thread(self, params: dict[str, Any]) -> dict[str, Any]:
         request = MapInlineThreadRequest.model_validate(params)
@@ -650,7 +687,33 @@ class MCPServer:
         from .review_schemas import ReviewPRRequest
         return {
             "review_pr": schema_for(ReviewPRRequest),
-            "apply_actions": schema_for(ApplyActionsRequest),
+            "reply_to_inline_comment": {
+                "type": "object",
+                "properties": {
+                    "pr_number": {"type": "integer"},
+                    "comment_id": {"type": "string"},
+                    "reply_text": {"type": "string"}
+                },
+                "required": ["pr_number", "comment_id", "reply_text"]
+            },
+            "reply_to_general_comment": {
+                "type": "object",
+                "properties": {
+                    "pr_number": {"type": "integer"},
+                    "reply_text": {"type": "string"}
+                },
+                "required": ["pr_number", "reply_text"]
+            },
+            "add_new_inline_comment": {
+                "type": "object",
+                "properties": {
+                    "pr_number": {"type": "integer"},
+                    "comment_text": {"type": "string"},
+                    "file_path": {"type": "string"},
+                    "line_number": {"type": "integer"}
+                },
+                "required": ["pr_number", "comment_text", "file_path", "line_number"]
+            },
             "generate_reply": schema_for(GenerateReplyRequest),
             "get_pending_reviews": {
                 "type": "object", 

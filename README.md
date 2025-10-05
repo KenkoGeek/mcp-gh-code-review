@@ -9,8 +9,6 @@ A production-focused Model Context Protocol (MCP) server for automating GitHub p
 - **Webhook Integration** - FastAPI endpoint with GitHub signature verification
 - **Idempotent Storage** - SQLite-backed thread mappings for retry safety
 - **Policy Engine** - YAML-driven triage rules for labels, assignments, and automation
-- **Production Ready** - Structured logging, error handling, rate limit tracking, dry-run mode
-- **Modern Python** - Uses match/case patterns, type hints, and Python 3.11+ features
 - **Comprehensive Tests** - 14 tests covering all core functionality
 
 ## Quick Start
