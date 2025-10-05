@@ -126,7 +126,7 @@ class ActionExecutor:
                 if "in_reply_to" in action.metadata:
                     # Reply to inline comment (review comment)
                     path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/comments"
-                    payload["in_reply_to"] = int(action.metadata["in_reply_to"])
+                    payload["in_reply_to"] = str(action.metadata["in_reply_to"])
                 else:
                     # General PR comment
                     path = f"/repos/{pr['owner']}/{pr['repo']}/issues/{pr['number']}/comments"
@@ -143,7 +143,7 @@ class ActionExecutor:
                     "line": action.metadata.get("line")
                 }
                 if "in_reply_to" in action.metadata:
-                    payload["in_reply_to"] = int(action.metadata["in_reply_to"])
+                    payload["in_reply_to"] = str(action.metadata["in_reply_to"])
                 self.client.post(path, payload=payload)
         elif action.type == ActionType.reply_to_pending_review and action.metadata:
             pr = action.metadata.get("pr")

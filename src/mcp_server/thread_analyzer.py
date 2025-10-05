@@ -106,7 +106,7 @@ class ThreadAnalyzer:
                 last_external_comment = comment
         
         # Need response if last comment is from external user and we haven't responded to it
-        needs_response = (
+        needs_response = bool(
             not self._is_our_response(last_author) and
             (not our_last_response or 
              (last_external_comment and 

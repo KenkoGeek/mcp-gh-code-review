@@ -63,7 +63,7 @@ class PROrchestrator:
     
     async def _run_triage(self, pr_data: dict[str, Any], analysis: dict[str, Any]) -> dict[str, Any]:
         """Run triage on all PR events."""
-        triage_results = {
+        triage_results: dict[str, Any] = {
             "suggested_labels": [],
             "suggested_assignments": [],
             "automated_actions": []

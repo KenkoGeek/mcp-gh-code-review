@@ -52,7 +52,7 @@ class JSONRPCServer:
     async def _handle_tools_list(self, message: dict[str, Any]) -> dict[str, Any]:
         tools = []
         for name, _handler in self.handlers.items():
-            tool = {"name": name, "description": f"MCP tool: {name}"}
+            tool: dict[str, Any] = {"name": name, "description": f"MCP tool: {name}"}
             if self.schemas and name in self.schemas:
                 tool["inputSchema"] = self.schemas[name]
             else:

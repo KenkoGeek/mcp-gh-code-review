@@ -23,7 +23,7 @@ class GitHubGraphQLClient:
     
     async def query(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         """Execute GraphQL query."""
-        payload = {"query": query}
+        payload: dict[str, Any] = {"query": query}
         if variables:
             payload["variables"] = variables
         
@@ -35,7 +35,8 @@ class GitHubGraphQLClient:
                 timeout=30.0
             )
             response.raise_for_status()
-            return response.json()
+            result: dict[str, Any] = response.json()
+            return result
     
     async def get_pending_reviews(self, owner: str, repo: str, pr_number: int) -> dict[str, Any]:
         """Get pending reviews with inline comments."""

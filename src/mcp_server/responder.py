@@ -23,7 +23,7 @@ class Responder:
         )
         if request.actor_type.value == "bot":
             body = self._bot_reply(request)
-            followups = [
+            followups: list[Action] = [
                 Action(
                     type=ActionType.comment,
                     value="Bot response tracked",
@@ -32,16 +32,16 @@ class Responder:
             ]
             return GenerateReplyResponse(body=body, followups=followups, resolve_thread=False)
         body = self._human_reply(request)
-        followups: list[Action] = []
+        reply_followups: list[Action] = []
         if request.code_context and request.code_context.after:
-            followups.append(
+            reply_followups.append(
                 Action(
                     type=ActionType.comment,
                     value=f"Proposed change:\n```diff\n{request.code_context.after}\n```",
                     metadata={"thread": request.thread.id},
                 )
             )
-        return GenerateReplyResponse(body=body, resolve_thread=False, followups=followups)
+        return GenerateReplyResponse(body=body, resolve_thread=False, followups=reply_followups)
 
     def _bot_reply(self, request: GenerateReplyRequest) -> str:
         base = "🤖 Thanks for the automated update."

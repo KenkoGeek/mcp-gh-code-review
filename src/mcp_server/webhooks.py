@@ -44,7 +44,7 @@ async def handle_webhook(
     secret = os.environ.get("GITHUB_WEBHOOK_SECRET")
     await verify_signature(request, x_hub_signature_256, secret)
     payload = await request.json()
-    logger.info("webhook.received", event=x_github_event, delivery=payload.get("delivery"))
+    logger.info(f"webhook.received event={x_github_event} delivery={payload.get('delivery')}")
     # For now we simply acknowledge receipt; orchestration happens asynchronously.
     return Response(status_code=202)
 

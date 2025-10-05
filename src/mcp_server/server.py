@@ -62,7 +62,7 @@ class MCPServer:
         action_executor = ActionExecutor(client=GitHubClient(config=config.github))
         storage = Storage(config.db_path)
         thread_manager = ThreadManager(storage=storage)
-        graphql_client = GitHubGraphQLClient(config.github.token)
+        graphql_client = GitHubGraphQLClient(config.github.token or "")
         server = cls(
             config=config,
             policy=policy,
@@ -71,7 +71,7 @@ class MCPServer:
             triage_engine=triage_engine,
             action_executor=action_executor,
             thread_manager=thread_manager,
-            orchestrator=None,  # Will be set after creation
+            orchestrator=None,  # type: ignore # Will be set after creation
             graphql_client=graphql_client,
         )
         server.orchestrator = PROrchestrator(server)
@@ -363,7 +363,7 @@ class MCPServer:
             # Add comprehensive analysis
             if "reviews" in result and "inline_comments" in result:
                 # Map inline comments to their review threads
-                inline_by_thread = {}
+                inline_by_thread: dict[str, list[dict[str, Any]]] = {}
                 for comment in result["inline_comments"]:
                     thread_key = f"{comment.get('path', 'unknown')}:{comment.get('line', 0)}"
                     if thread_key not in inline_by_thread:
@@ -406,7 +406,7 @@ class MCPServer:
         threads = analyzer.analyze_threads(inline_comments)
         priority_threads = analyzer.get_priority_threads(threads)
         
-        analysis = {
+        analysis: dict[str, Any] = {
             "summary": {
                 "total_reviews": len(reviews),
                 "changes_requested": len([r for r in reviews if r.get("state") == "CHANGES_REQUESTED"]),
@@ -449,7 +449,7 @@ class MCPServer:
                 review_item = {
                     "review_id": review["id"],
                     "author": review["user"]["login"],
-                    "actor_type": classification.actor_type.value,
+                    "actor_type": classification.actor_type,
                     "body": review.get("body", ""),
                     "submitted_at": review.get("submitted_at")
                 }
@@ -488,7 +488,7 @@ class MCPServer:
         try:
             response = self.action_executor.client.get("/user")
             user_data = response.json()
-            return user_data.get("login", "unknown")
+            return str(user_data.get("login", "unknown"))
         except Exception:
             return "unknown"
 
@@ -515,7 +515,7 @@ class MCPServer:
             if request.action == "submit":
                 # Submit pending review
                 path = f"/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
-                payload = {
+                payload: dict[str, Any] = {
                     "event": request.event,
                     "body": request.body or ""
                 }
@@ -535,7 +535,8 @@ class MCPServer:
                 # First get pending reviews to find the one to dismiss
                 reviews_path = f"/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
                 reviews_response = self.action_executor.client.get(reviews_path)
-                reviews = reviews_response.json()
+                reviews_response_data = reviews_response.json()
+                reviews: list[dict[str, Any]] = reviews_response_data if isinstance(reviews_response_data, list) else []
                 
                 pending_review = next((r for r in reviews if r["state"] == "PENDING"), None)
                 if not pending_review:
