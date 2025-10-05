@@ -4,7 +4,6 @@ RUN groupadd -r app && useradd -r -g app app
 WORKDIR /app
 
 COPY pyproject.toml README.md LICENSE ./
-RUN pip install --no-cache-dir .
 COPY src ./src
 RUN pip install --no-cache-dir .
 

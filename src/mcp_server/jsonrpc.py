@@ -91,7 +91,14 @@ class JSONRPCServer:
                 sys.stdout.flush()
             except (EOFError, KeyboardInterrupt):
                 break
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                error_response = {
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {"code": -32700, "message": f"Parse error: {e}"}
+                }
+                sys.stdout.write(json.dumps(error_response) + "\n")
+                sys.stdout.flush()
                 continue
             except Exception as e:
                 error_response = {

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import Any
 
 from .actions import ActionExecutor, GitHubClient
@@ -131,7 +131,8 @@ class MCPServer:
             try:
                 pr_data = await self.get_pr_data({"pr_number": pr_number, "include": ["pending_reviews"]})
                 has_pending_review = "pending_reviews" in pr_data and pr_data["pending_reviews"]["count"] > 0
-            except Exception:
+            except Exception as e:
+                logger.warning("failed_to_check_pending_reviews", error=str(e))
                 has_pending_review = False
             
             # Add PR context and optimize action types
@@ -151,7 +152,7 @@ class MCPServer:
         # Log action optimization for debugging
         logger.info("optimized_actions", 
                    action_types=[action.type.value for action in request.actions],
-                   has_pending_review=has_pending_review if 'has_pending_review' in locals() else False)
+                   has_pending_review=has_pending_review)
         
         results = self.action_executor.apply(
             request.actions, dry_run=request.dry_run or self.config.dry_run
@@ -191,13 +192,18 @@ class MCPServer:
             return {"error": "Not in a git repository root. Please run from project root directory."}
         
         try:
+            import shutil
+            git_path = shutil.which("git")
+            if not git_path:
+                return {"error": "Git command not found in PATH"}
+            
             result = subprocess.run(
-                ["git", "remote", "get-url", "origin"],
+                [git_path, "remote", "get-url", "origin"],
                 capture_output=True, text=True, timeout=5
             )
             if result.returncode == 0:
                 url = result.stdout.strip()
-                if "github.com" in url:
+                if url.startswith("https://github.com/") or url.startswith("git@github.com:"):
                     if url.startswith("git@"):
                         parts = url.split(":")[1].replace(".git", "").split("/")
                     else:

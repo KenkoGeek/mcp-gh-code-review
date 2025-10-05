@@ -44,7 +44,7 @@ class PROrchestrator:
         triage_results = await self._run_triage(pr_data, analysis)
         
         # 4. Generate priority actions (including triage)
-        priority_actions = self._generate_priority_actions(analysis, triage_results)
+        priority_actions = self._generate_priority_actions(analysis, triage_results, pr_number)
         
         # 5. Create summary
         summary = self._create_summary(pr_data, analysis, triage_results)
@@ -80,7 +80,7 @@ class PROrchestrator:
         
         return triage_results
     
-    def _generate_priority_actions(self, analysis: dict[str, Any], triage_results: dict[str, Any]) -> list[dict[str, Any]]:
+    def _generate_priority_actions(self, analysis: dict[str, Any], triage_results: dict[str, Any], pr_number: int) -> list[dict[str, Any]]:
         """Generate suggested actions based on analysis."""
         actions = []
         
@@ -95,7 +95,7 @@ class PROrchestrator:
                 "participants": response["participants"],
                 "suggested_action": {
                     "type": "comment",
-                    "metadata": {"pr_number": 1, "in_reply_to": str(response["comment_id"])}
+                    "metadata": {"pr_number": pr_number, "in_reply_to": str(response["comment_id"])}
                 }
             })
         
@@ -108,7 +108,7 @@ class PROrchestrator:
                 "suggested_action": {
                     "type": "apply_label",
                     "value": label,
-                    "metadata": {"pr_number": 1}
+                    "metadata": {"pr_number": pr_number}
                 }
             })
         

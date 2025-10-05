@@ -38,7 +38,7 @@ class Storage:
 
     @contextmanager
     def _connection(self) -> Iterator[sqlite3.Connection]:
-        conn = sqlite3.connect(self._path, isolation_level=None, check_same_thread=False)
+        conn = sqlite3.connect(self._path, isolation_level=None, check_same_thread=False, timeout=5.0)
         try:
             yield conn
         finally:

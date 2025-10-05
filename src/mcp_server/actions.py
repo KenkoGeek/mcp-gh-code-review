@@ -69,6 +69,25 @@ class GitHubClient:
 
     def close(self) -> None:
         self._client.close()
+    
+    def _validate_pr_metadata(self, pr: dict) -> bool:
+        """Validate PR metadata to prevent path traversal."""
+        required_fields = ['owner', 'repo', 'number']
+        if not all(field in pr for field in required_fields):
+            return False
+        
+        # Validate owner and repo are safe strings
+        import re
+        safe_pattern = re.compile(r'^[a-zA-Z0-9._-]+$')
+        if not safe_pattern.match(str(pr['owner'])) or not safe_pattern.match(str(pr['repo'])):
+            return False
+        
+        # Validate number is positive integer
+        try:
+            num = int(pr['number'])
+            return num > 0
+        except (ValueError, TypeError):
+            return False
 
 
 @dataclass(slots=True)
@@ -92,12 +111,12 @@ class ActionExecutor:
         logger.info("applying_action", action_type=action.type.value)
         if action.type == ActionType.apply_label and action.metadata:
             pr = action.metadata.get("pr")
-            if pr:
+            if pr and self._validate_pr_metadata(pr):
                 path = f"/repos/{pr['owner']}/{pr['repo']}/issues/{pr['number']}/labels"
                 self.client.post(path, payload={"labels": [action.value]})
         elif action.type == ActionType.comment and action.metadata:
             pr = action.metadata.get("pr")
-            if pr:
+            if pr and self._validate_pr_metadata(pr):
                 payload = {"body": action.value}
                 # Check if this is a reply to an inline comment
                 if "in_reply_to" in action.metadata:

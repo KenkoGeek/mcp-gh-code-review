@@ -66,9 +66,12 @@ def load_policy(path: Path) -> PolicyConfig:
     if not path.exists():
         return PolicyConfig()
     try:
-        data = yaml.safe_load(path.read_text())
+        with open(path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
     except yaml.YAMLError as exc:
         raise ValueError(f"Invalid YAML in policy file: {exc}") from exc
+    except (OSError, IOError) as exc:
+        raise ValueError(f"Cannot read policy file: {exc}") from exc
     if not isinstance(data, MutableMapping):  # pragma: no cover - defensive
         raise ValueError("Policy file must contain a mapping")
     labels = {str(k): list(v) for k, v in data.get("labels", {}).items()}
