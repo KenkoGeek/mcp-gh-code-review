@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .actions import GitHubClient
+from .bot_detector import is_bot
 from .graphql_client import GitHubGraphQLClient
 from .jsonrpc import JSONRPCServer
 from .schemas import SubmitPendingReviewRequest, schema_for
@@ -61,10 +62,18 @@ class MCPServer:
         pr_response = self.client.get(f"/repos/{owner}/{repo}/pulls/{pr_number}")
         reviews_response = self.client.get(f"/repos/{owner}/{repo}/pulls/{pr_number}/reviews")
         
+        # Annotate threads with bot detection
+        threads = threads_data.get("threads", [])
+        for thread in threads:
+            for comment in thread.get("comments", {}).get("nodes", []):
+                author = comment.get("author", {})
+                if author:
+                    author["is_bot"] = is_bot(author.get("login", ""))
+        
         return {
             "pr_info": pr_response.json(),
             "reviews": reviews_response.json(),
-            "threads": threads_data.get("threads", []),
+            "threads": threads,
             "threads_count": threads_data.get("count", 0)
         }
     
