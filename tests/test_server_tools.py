@@ -1,7 +1,8 @@
 import pytest
-from mcp_server.server import MCPServer
+
 from mcp_server.actions import GitHubClient
 from mcp_server.graphql_client import GitHubGraphQLClient
+from mcp_server.server import MCPServer
 
 
 @pytest.mark.anyio
