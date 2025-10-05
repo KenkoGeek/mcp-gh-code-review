@@ -9,9 +9,6 @@ on:
     - cron: '0 0 * * 1'  # Weekly on Monday
   workflow_call:
 
-permissions:
-  contents: read
-
 jobs:
   analyze:
     name: Analyze
