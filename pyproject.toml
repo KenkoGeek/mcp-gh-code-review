@@ -24,6 +24,9 @@ dependencies = [
   "tenacity>=8.2"
 ]
 
+[project.scripts]
+mcp-gh-review = "mcp_server.cli:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.1",
