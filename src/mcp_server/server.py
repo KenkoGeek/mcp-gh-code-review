@@ -131,6 +131,64 @@ class MCPServer:
             owner, repo, request.pr_number, request.review_id, request.event, request.body
         )
     
+    async def review_issue(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Get issue with comments."""
+        issue_number = params["issue_number"]
+        owner, repo = self._get_repo()
+        logger.info("review_issue_start", issue_number=issue_number, owner=owner, repo=repo)
+        
+        # Get authenticated user
+        user_response = self.client.get("/user")
+        authenticated_user = user_response.json()["login"]
+        
+        # Get issue + comments
+        issue_response = self.client.get(f"/repos/{owner}/{repo}/issues/{issue_number}")
+        comments_response = self.client.get(f"/repos/{owner}/{repo}/issues/{issue_number}/comments")
+        
+        issue_data = issue_response.json()
+        comments = comments_response.json()
+        
+        # Annotate comments with bot detection and own comment detection
+        for comment in comments:
+            user = comment.get("user", {})
+            if user:
+                login = user.get("login", "")
+                user["is_bot"] = is_bot(login)
+                user["is_me"] = login == authenticated_user
+        
+        logger.info(
+            "review_issue_complete",
+            issue_number=issue_number,
+            comments_count=len(comments),
+            authenticated_user=authenticated_user,
+        )
+        return {
+            "issue": issue_data,
+            "comments": comments,
+            "authenticated_user": authenticated_user,
+            "_guidance": (
+                "When replying: "
+                "is_bot=true → short replies (1-2 lines, e.g. 'Thanks for the update'), "
+                "is_bot=false → detailed replies, "
+                "is_me=true → skip (your own comments)"
+            )
+        }
+    
+    async def reply_to_issue_comment(self, params: dict[str, Any]) -> dict[str, Any]:
+        """Reply to issue comment."""
+        issue_number = params["issue_number"]
+        reply_text = params["reply_text"]
+        owner, repo = self._get_repo()
+        
+        logger.info("reply_to_issue_comment", issue_number=issue_number, owner=owner, repo=repo)
+        
+        path = f"/repos/{owner}/{repo}/issues/{issue_number}/comments"
+        payload = {"body": reply_text}
+        
+        self.client.post(path, payload=payload)
+        logger.info("reply_to_issue_comment_success", issue_number=issue_number)
+        return {"success": True}
+    
     async def health(self, params: dict[str, Any]) -> dict[str, Any]:
         """Health check."""
         return {
@@ -148,6 +206,8 @@ class MCPServer:
             "reply_to_comment": self._wrap(self.reply_to_comment),
             "get_review_threads": self._wrap(self.get_review_threads),
             "submit_pending_review": self._wrap(self.submit_pending_review),
+            "review_issue": self._wrap(self.review_issue),
+            "reply_to_issue_comment": self._wrap(self.reply_to_issue_comment),
             "health": self._wrap(self.health),
         }
     
@@ -181,6 +241,19 @@ class MCPServer:
                 "required": ["pr_number"]
             },
             "submit_pending_review": schema_for(SubmitPendingReviewRequest),
+            "review_issue": {
+                "type": "object",
+                "properties": {"issue_number": {"type": "integer"}},
+                "required": ["issue_number"]
+            },
+            "reply_to_issue_comment": {
+                "type": "object",
+                "properties": {
+                    "issue_number": {"type": "integer"},
+                    "reply_text": {"type": "string"}
+                },
+                "required": ["issue_number", "reply_text"]
+            },
             "health": {"type": "object", "properties": {}}
         }
     
