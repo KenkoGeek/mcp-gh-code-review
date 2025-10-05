@@ -21,8 +21,8 @@ def _handle_http_error(e: httpx.HTTPStatusError) -> NoReturn:
         raise ValueError(f"Invalid GitHub token: {gh_message}") from e
     if e.response.status_code == 404:
         raise ValueError(f"Resource not found: {gh_message}") from e
-    if e.response.status_code == 403:
-        raise ValueError(f"GitHub API forbidden: {gh_message}") from e
+    if e.response.status_code in (403, 429):
+        raise ValueError(f"GitHub API rate limit exceeded: {gh_message}") from e
     raise ValueError(f"GitHub API error ({e.response.status_code}): {gh_message}") from e
 
 

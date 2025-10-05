@@ -34,7 +34,18 @@ def test_rate_limit_exceeded():
         return_value=Response(403, json={"message": "API rate limit exceeded"})
     )
     
-    with pytest.raises(ValueError, match="GitHub API forbidden.*rate limit"):
+    with pytest.raises(ValueError, match="rate limit exceeded"):
+        client.get("/user")
+
+
+@respx.mock
+def test_rate_limit_429():
+    client = GitHubClient(token="test_token")
+    respx.get("https://api.github.com/user").mock(
+        return_value=Response(429, json={"message": "You have exceeded a secondary rate limit"})
+    )
+    
+    with pytest.raises(ValueError, match="rate limit exceeded"):
         client.get("/user")
 
 
