@@ -80,8 +80,9 @@ jobs:
         uses: lewagon/wait-on-check-action@595dabb3acf442d47e29c9ec9ba44db0c6bdd18f # v1.3.4
         with:
           ref: ${{ github.sha }}
-          check-name: 'Analyze'
+          check-name: 'Analyze (python)'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
 
   release:
     runs-on: ubuntu-latest
