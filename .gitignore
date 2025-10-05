@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+.mcp/
+.env
+.coverage
+coverage.xml
+htmlcov/
+node_modules/
+package-lock.json
+*.egg-info/
+dist/
+.amazonq/
+*_cache/
+.DS_Store

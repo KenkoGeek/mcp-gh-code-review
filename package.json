@@ -1,0 +1,17 @@
+{
+  "name": "mcp-github-review-server",
+  "version": "0.0.0-development",
+  "description": "MCP server for managing GitHub pull request reviews",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KenkoGeek/mcp-gh-code-review.git"
+  },
+  "license": "MIT",
+  "private": true,
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^10.0.3",
+    "semantic-release": "^23.0.0"
+  }
+}
