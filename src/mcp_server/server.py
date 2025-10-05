@@ -153,6 +153,12 @@ class MCPServer:
             raise
         
         issue_data = issue_response.json()
+        
+        # GitHub /issues endpoint returns both issues and PRs
+        # Reject PRs - only accept real issues
+        if "pull_request" in issue_data and issue_data["pull_request"] is not None:
+            raise ValueError(f"#{issue_number} is a pull request, not an issue. Use review_pr instead.")
+        
         comments = comments_response.json()
         
         # Annotate comments with bot detection and own comment detection
