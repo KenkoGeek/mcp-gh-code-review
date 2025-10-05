@@ -20,7 +20,7 @@ logger = structlog.get_logger(__name__)
 
 @dataclass(slots=True)
 class MCPServer:
-    """MCP server with 7 tools: 5 PR + 2 issues + health."""
+    """MCP server with 8 tools: 5 PR + 3 issues + health."""
     
     token: str
     client: GitHubClient
@@ -131,6 +131,30 @@ class MCPServer:
             owner, repo, request.pr_number, request.review_id, request.event, request.body
         )
     
+    async def list_issues(self, params: dict[str, Any]) -> dict[str, Any]:
+        """List all issues (excluding PRs)."""
+        owner, repo = self._get_repo()
+        state = params.get("state", "open")  # open, closed, all
+        
+        logger.info("list_issues_start", owner=owner, repo=repo, state=state)
+        
+        try:
+            # Get all issues (includes PRs)
+            response = self.client.get(f"/repos/{owner}/{repo}/issues?state={state}&per_page=100")
+            all_items = response.json()
+            
+            # Filter out PRs - only keep real issues
+            issues = [
+                item for item in all_items 
+                if "pull_request" not in item or item["pull_request"] is None
+            ]
+            
+            logger.info("list_issues_complete", count=len(issues), state=state)
+            return {"issues": issues, "count": len(issues)}
+        except Exception as e:
+            logger.error("list_issues_failed", error=str(e))
+            raise
+    
     async def review_issue(self, params: dict[str, Any]) -> dict[str, Any]:
         """Get issue with comments."""
         issue_number = params["issue_number"]
@@ -227,6 +251,7 @@ class MCPServer:
             "reply_to_comment": self._wrap(self.reply_to_comment),
             "get_review_threads": self._wrap(self.get_review_threads),
             "submit_pending_review": self._wrap(self.submit_pending_review),
+            "list_issues": self._wrap(self.list_issues),
             "review_issue": self._wrap(self.review_issue),
             "reply_to_issue_comment": self._wrap(self.reply_to_issue_comment),
             "health": self._wrap(self.health),
@@ -262,6 +287,12 @@ class MCPServer:
                 "required": ["pr_number"]
             },
             "submit_pending_review": schema_for(SubmitPendingReviewRequest),
+            "list_issues": {
+                "type": "object",
+                "properties": {
+                    "state": {"type": "string", "enum": ["open", "closed", "all"]}
+                }
+            },
             "review_issue": {
                 "type": "object",
                 "properties": {"issue_number": {"type": "integer"}},
