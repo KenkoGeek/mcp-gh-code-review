@@ -4,12 +4,13 @@ A production-focused Model Context Protocol (MCP) server for automating GitHub p
 
 ## Features
 
-- **7 JSON-RPC Tools** - Classify actors, triage events, generate replies, apply actions, manage threads, update policies, health checks
+- **7 JSON-RPC Tools** - Comprehensive PR review, pending review management, apply actions, generate replies, health checks, policy updates
 - **Bot Detection** - Deterministic classifier with configurable patterns and caching
 - **Webhook Integration** - FastAPI endpoint with GitHub signature verification
 - **Idempotent Storage** - SQLite-backed thread mappings for retry safety
 - **Policy Engine** - YAML-driven triage rules for labels, assignments, and automation
 - **Production Ready** - Structured logging, error handling, rate limit tracking, dry-run mode
+- **Modern Python** - Uses match/case patterns, type hints, and Python 3.10+ features
 - **Comprehensive Tests** - 14 tests covering all core functionality
 
 ## Quick Start
@@ -119,11 +120,11 @@ docker run -p 8000:8000 \
 
 | Tool | Description |
 |------|-------------|
-| `classify_actor` | Detect if GitHub user is bot or human |
-| `triage_event` | Apply policy rules to PR events (labels, assignments) |
-| `generate_reply` | Create context-aware responses for comments |
+| `review_pr` | Comprehensive PR analysis with conversation threads and priority actions |
+| `get_pending_reviews` | Retrieve pending reviews with inline comments via GraphQL |
+| `submit_pending_review` | Submit pending reviews with specified event type |
 | `apply_actions` | Execute GitHub API actions (comment, label, assign) |
-| `map_inline_thread` | Track review comment thread IDs |
+| `generate_reply` | Create context-aware responses for comments |
 | `set_policy` | Update triage policy at runtime |
 | `health` | Check server status, database, and rate limits |
 

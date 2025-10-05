@@ -23,12 +23,13 @@ class JSONRPCServer:
         method = message["method"]
         
         # Handle MCP protocol methods
-        if method == "initialize":
-            return await self._handle_initialize(message)
-        elif method == "tools/list":
-            return await self._handle_tools_list(message)
-        elif method == "tools/call":
-            return await self._handle_tools_call(message)
+        match method:
+            case "initialize":
+                return await self._handle_initialize(message)
+            case "tools/list":
+                return await self._handle_tools_list(message)
+            case "tools/call":
+                return await self._handle_tools_call(message)
         
         handler = self.handlers.get(method)
         if handler is None:

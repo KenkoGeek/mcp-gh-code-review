@@ -53,6 +53,20 @@ class GitHubClient:
         response.raise_for_status()
         return response
 
+    @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3))
+    def get(self, path: str) -> httpx.Response:
+        response = self._client.get(f"{self.base_url}{path}")
+        self._update_rate_limits(response)
+        response.raise_for_status()
+        return response
+
+    @retry(wait=wait_exponential(min=1, max=10), stop=stop_after_attempt(3))
+    def put(self, path: str, payload: dict | None = None) -> httpx.Response:
+        response = self._client.put(f"{self.base_url}{path}", json=payload)
+        self._update_rate_limits(response)
+        response.raise_for_status()
+        return response
+
     def close(self) -> None:
         self._client.close()
 
@@ -84,8 +98,71 @@ class ActionExecutor:
         elif action.type == ActionType.comment and action.metadata:
             pr = action.metadata.get("pr")
             if pr:
-                path = f"/repos/{pr['owner']}/{pr['repo']}/issues/{pr['number']}/comments"
-                self.client.post(path, payload={"body": action.value})
+                payload = {"body": action.value}
+                # Check if this is a reply to an inline comment
+                if "in_reply_to" in action.metadata:
+                    # Reply to inline comment (review comment)
+                    path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/comments"
+                    payload["in_reply_to"] = int(action.metadata["in_reply_to"])
+                else:
+                    # General PR comment
+                    path = f"/repos/{pr['owner']}/{pr['repo']}/issues/{pr['number']}/comments"
+                self.client.post(path, payload=payload)
+        elif action.type == ActionType.add_review_comment and action.metadata:
+            pr = action.metadata.get("pr")
+            if pr:
+                # Add comment to pending review or create new review
+                path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/comments"
+                payload = {
+                    "body": action.value,
+                    "commit_id": action.metadata.get("commit_id"),
+                    "path": action.metadata.get("path"),
+                    "line": action.metadata.get("line")
+                }
+                if "in_reply_to" in action.metadata:
+                    payload["in_reply_to"] = int(action.metadata["in_reply_to"])
+                self.client.post(path, payload=payload)
+        elif action.type == ActionType.reply_to_pending_review and action.metadata:
+            pr = action.metadata.get("pr")
+            if pr:
+                # For pending reviews, we need to submit the entire review with the reply
+                # First, get the pending review
+                reviews_path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/reviews"
+                reviews_response = self.client.get(reviews_path)
+                reviews = reviews_response.json()
+                
+                pending_review = next((r for r in reviews if r["state"] == "PENDING"), None)
+                if pending_review:
+                    # Submit the pending review with our reply as a comment
+                    submit_path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/reviews/{pending_review['id']}/events"
+                    payload = {
+                        "event": "COMMENT",
+                        "body": action.value
+                    }
+                    self.client.post(submit_path, payload=payload)
+                else:
+                    # No pending review, create a regular comment
+                    path = f"/repos/{pr['owner']}/{pr['repo']}/issues/{pr['number']}/comments"
+                    payload = {"body": action.value}
+                    self.client.post(path, payload=payload)
+        elif action.type == ActionType.submit_review and action.metadata:
+            pr = action.metadata.get("pr")
+            if pr:
+                # Submit pending review
+                path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/reviews"
+                payload = {
+                    "event": action.metadata.get("event", "COMMENT"),
+                    "body": action.value or ""
+                }
+                self.client.post(path, payload=payload)
+        elif action.type == ActionType.dismiss_review and action.metadata:
+            pr = action.metadata.get("pr")
+            review_id = action.metadata.get("review_id")
+            if pr and review_id:
+                # Dismiss a review
+                path = f"/repos/{pr['owner']}/{pr['repo']}/pulls/{pr['number']}/reviews/{review_id}/dismissals"
+                payload = {"message": action.value or "Review dismissed"}
+                self.client.put(path, payload=payload)
         elif action.type == ActionType.rerun_checks and action.metadata:
             check_run_url = action.metadata.get("url")
             if check_run_url:

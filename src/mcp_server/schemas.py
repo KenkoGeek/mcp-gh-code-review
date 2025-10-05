@@ -46,6 +46,10 @@ class ActionType(str, Enum):
     rerun_checks = "rerun_checks"
     open_issue = "open_issue"
     resolve_thread = "resolve_thread"
+    submit_review = "submit_review"
+    dismiss_review = "dismiss_review"
+    add_review_comment = "add_review_comment"
+    reply_to_pending_review = "reply_to_pending_review"
 
 
 class Action(BaseModel):
@@ -112,7 +116,7 @@ class TriagedActions(BaseModel):
 
 
 class TriageEventRequest(BaseModel):
-    event: BaseEvent | ReviewEvent | CommentEvent | StatusEvent
+    event: CommentEvent | ReviewEvent | StatusEvent | BaseEvent
     policy: dict | None = None
 
 
@@ -160,6 +164,20 @@ class HealthResponse(BaseModel):
     rate_limit: dict = Field(default_factory=dict)
 
 
+class ManagePendingReviewRequest(BaseModel):
+    pr_number: int
+    action: str  # "submit", "dismiss", "add_comment"
+    event: str = "COMMENT"  # "APPROVE", "REQUEST_CHANGES", "COMMENT"
+    body: str | None = None
+    comments: list[dict] | None = None  # For adding review comments
+
+
+class ManagePendingReviewResponse(BaseModel):
+    success: bool
+    review_id: int | None = None
+    message: str | None = None
+
+
 def schema_for(model: type[BaseModel]) -> dict:
     """Return JSON schema for a model."""
 
@@ -190,5 +208,7 @@ __all__ = [
     "MapInlineThreadResponse",
     "SetPolicyRequest",
     "HealthResponse",
+    "ManagePendingReviewRequest",
+    "ManagePendingReviewResponse",
     "schema_for",
 ]

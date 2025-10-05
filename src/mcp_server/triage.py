@@ -60,12 +60,13 @@ class TriageEngine:
     def _handle_comment(
         self, event: CommentEvent, actor_type: str, triaged: TriagedActions
     ) -> None:
+        pr_metadata = {"owner": event.pr.owner, "repo": event.pr.repo, "number": event.pr.number}
         if actor_type == "bot":
             triaged.actions.append(
                 Action(
                     type=ActionType.comment,
                     value="🤖 Automated feedback noted. Running follow-up automation if required.",
-                    metadata={"event_id": event.event_id, "comment_id": event.comment_id},
+                    metadata={"event_id": event.event_id, "comment_id": event.comment_id, "pr": pr_metadata},
                 )
             )
         else:
@@ -73,7 +74,7 @@ class TriageEngine:
                 Action(
                     type=ActionType.comment,
                     value="Thanks for the feedback! We'll take a look right away.",
-                    metadata={"event_id": event.event_id, "comment_id": event.comment_id},
+                    metadata={"event_id": event.event_id, "comment_id": event.comment_id, "pr": pr_metadata},
                 )
             )
         if event.path:
