@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.1.1...v1.1.2) (2025-10-05)
+
+
+### Bug Fixes
+
+* add script entry point for uvx compatibility ([00a1a96](https://github.com/KenkoGeek/mcp-gh-code-review/commit/00a1a96d1ca3f8c0113a312562544f1059c2c28a))
+
 ## [1.1.1](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.1.0...v1.1.1) (2025-10-05)
 
 
