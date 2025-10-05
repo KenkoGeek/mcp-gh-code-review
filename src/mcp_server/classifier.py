@@ -42,7 +42,9 @@ class ActorClassifier:
                     break
             if matched_pattern:
                 result = Classification(
-                    actor_type="bot", reason="matched configured pattern", matched_rule=matched_pattern
+                    actor_type="bot", 
+                    reason="matched configured pattern", 
+                    matched_rule=matched_pattern
                 )
             elif name:
                 for pattern in self._patterns:
@@ -51,7 +53,9 @@ class ActorClassifier:
                         break
                 if matched_pattern:
                     result = Classification(
-                        actor_type="bot", reason="matched name pattern", matched_rule=matched_pattern
+                        actor_type="bot", 
+                        reason="matched name pattern", 
+                        matched_rule=matched_pattern
                     )
                 else:
                     result = Classification(actor_type="human", reason="no bot pattern matched")

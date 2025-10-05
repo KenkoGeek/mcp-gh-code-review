@@ -159,7 +159,9 @@ class ThreadAnalyzer:
         """Check if comment is from us (only authenticated user, not bots)."""
         return login == self.authenticated_user
     
-    def get_priority_threads(self, threads: list[ConversationThread], limit: int = 5) -> list[ConversationThread]:
+    def get_priority_threads(
+        self, threads: list[ConversationThread], limit: int = 5
+    ) -> list[ConversationThread]:
         """Get threads that need immediate attention."""
         return [t for t in threads if t.needs_response][:limit]
 

@@ -34,7 +34,12 @@ class TriageEngine:
         classification = self.classifier.classify(
             event.actor_login, name=getattr(event, "actor_name", None)
         )
-        logger.info("triaging_event", event_id=event.event_id, actor=event.actor_login, actor_type=classification.actor_type)
+        logger.info(
+            "triaging_event", 
+            event_id=event.event_id, 
+            actor=event.actor_login, 
+            actor_type=classification.actor_type
+        )
         triaged = TriagedActions()
         if isinstance(event, ReviewEvent):
             self._handle_review(event, triaged)

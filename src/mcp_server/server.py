@@ -201,7 +201,9 @@ class MCPServer:
         
         # Check if we're in a git repository
         if not Path(".git").exists():
-            return {"error": "Not in a git repository root. Please run from project root directory."}
+            return {
+                "error": "Not in a git repository root. Please run from project root directory."
+            }
         
         try:
             import shutil
@@ -263,7 +265,7 @@ class MCPServer:
             return {"error": str(e)}
 
     async def get_pr_data(self, params: dict[str, Any]) -> dict[str, Any]:
-        """Get comprehensive PR data: info, reviews, comments, inline comments, and pending reviews."""
+        """Get comprehensive PR data: info, reviews, comments, inline comments, pending reviews."""
         # Auto-detect context if not provided
         if not params.get("owner") or not params.get("repo"):
             context = self._auto_detect_context()
@@ -274,7 +276,10 @@ class MCPServer:
             owner, repo = params["owner"], params["repo"]
         
         pr_number = params.get("pr_number")
-        include_types = params.get("include", ["info", "reviews", "comments", "inline_comments", "pending_reviews"])
+        include_types = params.get(
+            "include", 
+            ["info", "reviews", "comments", "inline_comments", "pending_reviews"]
+        )
         
         if not all([owner, repo, pr_number]):
             return {"error": "Missing pr_number parameter"}
@@ -319,22 +324,30 @@ class MCPServer:
         try:
             # PR Info
             if "info" in include_types:
-                response = self.action_executor.client.get(f"/repos/{owner}/{repo}/pulls/{pr_number}")
+                response = self.action_executor.client.get(
+                    f"/repos/{owner}/{repo}/pulls/{pr_number}"
+                )
                 result["pr_info"] = response.json()
             
             # Reviews
             if "reviews" in include_types:
-                response = self.action_executor.client.get(f"/repos/{owner}/{repo}/pulls/{pr_number}/reviews")
+                response = self.action_executor.client.get(
+                    f"/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
+                )
                 result["reviews"] = response.json()
             
             # General comments
             if "comments" in include_types:
-                response = self.action_executor.client.get(f"/repos/{owner}/{repo}/issues/{pr_number}/comments")
+                response = self.action_executor.client.get(
+                    f"/repos/{owner}/{repo}/issues/{pr_number}/comments"
+                )
                 result["comments"] = response.json()
             
             # Inline comments
             if "inline_comments" in include_types:
-                response = self.action_executor.client.get(f"/repos/{owner}/{repo}/pulls/{pr_number}/comments")
+                response = self.action_executor.client.get(
+                    f"/repos/{owner}/{repo}/pulls/{pr_number}/comments"
+                )
                 result["inline_comments"] = response.json()
             
             # Pending reviews analysis
@@ -360,7 +373,9 @@ class MCPServer:
                 result["analysis"] = {
                     "total_reviews": len(result["reviews"]),
                     "pending_count": len([r for r in result["reviews"] if r.get("state") == "PENDING"]),
-                    "changes_requested_count": len([r for r in result["reviews"] if r.get("state") == "CHANGES_REQUESTED"]),
+                    "changes_requested_count": len([
+                        r for r in result["reviews"] if r.get("state") == "CHANGES_REQUESTED"
+                    ]),
                     "approved_count": len([r for r in result["reviews"] if r.get("state") == "APPROVED"]),
                     "inline_threads": inline_by_thread,
                     "unanswered_comments": [
@@ -530,7 +545,10 @@ class MCPServer:
                     ).model_dump()
                 
                 # Dismiss the pending review
-                dismiss_path = f"/repos/{owner}/{repo}/pulls/{pr_number}/reviews/{pending_review['id']}/dismissals"
+                dismiss_path = (
+                    f"/repos/{owner}/{repo}/pulls/{pr_number}/"
+                    f"reviews/{pending_review['id']}/dismissals"
+                )
                 dismiss_payload = {"message": request.body or "Review dismissed"}
                 self.action_executor.client.put(dismiss_path, payload=dismiss_payload)
                 
@@ -632,7 +650,11 @@ class MCPServer:
             "review_pr": schema_for(ReviewPRRequest),
             "apply_actions": schema_for(ApplyActionsRequest),
             "generate_reply": schema_for(GenerateReplyRequest),
-            "get_pending_reviews": {"type": "object", "properties": {"pr_number": {"type": "integer"}}, "required": ["pr_number"]},
+            "get_pending_reviews": {
+                "type": "object", 
+                "properties": {"pr_number": {"type": "integer"}}, 
+                "required": ["pr_number"]
+            },
             "submit_pending_review": schema_for(SubmitPendingReviewRequest),
             "health": {"type": "object", "properties": {}},
             "set_policy": schema_for(SetPolicyRequest),

@@ -20,13 +20,18 @@ class PROrchestrator:
     def __init__(self, server):
         self.server = server
     
-    async def review_pr(self, pr_number: int, owner: str, repo: str, include_all: bool = True) -> PRReviewResult:
+    async def review_pr(
+        self, pr_number: int, owner: str, repo: str, include_all: bool = True
+    ) -> PRReviewResult:
         """Complete PR review workflow - single entry point."""
         
         # 1. Get comprehensive PR data
         pr_data = await self.server.get_pr_data({
             "pr_number": pr_number,
-            "include": ["info", "reviews", "comments", "inline_comments", "pending_reviews"] if include_all else ["info"]
+            "include": (
+                ["info", "reviews", "comments", "inline_comments", "pending_reviews"] 
+                if include_all else ["info"]
+            )
         })
         
         if "error" in pr_data:
@@ -80,7 +85,9 @@ class PROrchestrator:
         
         return triage_results
     
-    def _generate_priority_actions(self, analysis: dict[str, Any], triage_results: dict[str, Any], pr_number: int) -> list[dict[str, Any]]:
+    def _generate_priority_actions(
+        self, analysis: dict[str, Any], triage_results: dict[str, Any], pr_number: int
+    ) -> list[dict[str, Any]]:
         """Generate suggested actions based on analysis."""
         actions = []
         
@@ -127,7 +134,9 @@ class PROrchestrator:
         
         return actions
     
-    def _create_summary(self, pr_data: dict[str, Any], analysis: dict[str, Any], triage_results: dict[str, Any]) -> dict[str, Any]:
+    def _create_summary(
+        self, pr_data: dict[str, Any], analysis: dict[str, Any], triage_results: dict[str, Any]
+    ) -> dict[str, Any]:
         """Create executive summary of PR status."""
         pr_info = pr_data.get("pr_info", {})
         summary_data = analysis.get("summary", {})
