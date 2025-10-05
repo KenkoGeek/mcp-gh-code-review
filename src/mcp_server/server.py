@@ -536,7 +536,8 @@ class MCPServer:
                 reviews_path = f"/repos/{owner}/{repo}/pulls/{pr_number}/reviews"
                 reviews_response = self.action_executor.client.get(reviews_path)
                 reviews_response_data = reviews_response.json()
-                reviews: list[dict[str, Any]] = reviews_response_data if isinstance(reviews_response_data, list) else []
+                reviews: list[dict[str, Any]] = reviews_response_data if isinstance(
+                    reviews_response_data, list) else []
                 
                 pending_review = next((r for r in reviews if r["state"] == "PENDING"), None)
                 if not pending_review:
