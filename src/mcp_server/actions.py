@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 from typing import NoReturn
 
 import httpx
+import structlog
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
+logger = structlog.get_logger(__name__)
 
 
 def _handle_http_error(e: httpx.HTTPStatusError) -> NoReturn:
@@ -56,13 +59,17 @@ class GitHubClient:
     )
     def post(self, path: str, payload: dict | None = None) -> httpx.Response:
         try:
+            logger.info("github_api_request", method="POST", path=path)
             response = self._client.post(f"{self.base_url}{path}", json=payload)
             self._update_rate_limits(response)
             response.raise_for_status()
+            logger.info("github_api_success", method="POST", path=path, status=response.status_code)
             return response
         except httpx.HTTPStatusError as e:
+            logger.error("github_api_error", method="POST", path=path, status=e.response.status_code)
             _handle_http_error(e)
         except httpx.RequestError as e:
+            logger.error("github_api_connection_failed", method="POST", path=path, error=str(e))
             raise ValueError(f"GitHub API connection failed: {e}") from e
 
     @retry(
@@ -72,13 +79,17 @@ class GitHubClient:
     )
     def patch(self, path: str, payload: dict | None = None) -> httpx.Response:
         try:
+            logger.info("github_api_request", method="PATCH", path=path)
             response = self._client.patch(f"{self.base_url}{path}", json=payload)
             self._update_rate_limits(response)
             response.raise_for_status()
+            logger.info("github_api_success", method="PATCH", path=path, status=response.status_code)
             return response
         except httpx.HTTPStatusError as e:
+            logger.error("github_api_error", method="PATCH", path=path, status=e.response.status_code)
             _handle_http_error(e)
         except httpx.RequestError as e:
+            logger.error("github_api_connection_failed", method="PATCH", path=path, error=str(e))
             raise ValueError(f"GitHub API connection failed: {e}") from e
 
     @retry(
@@ -88,13 +99,23 @@ class GitHubClient:
     )
     def get(self, path: str) -> httpx.Response:
         try:
+            logger.info("github_api_request", method="GET", path=path)
             response = self._client.get(f"{self.base_url}{path}")
             self._update_rate_limits(response)
             response.raise_for_status()
+            logger.info(
+                "github_api_success",
+                method="GET",
+                path=path,
+                status=response.status_code,
+                rate_limit_remaining=self.rate_limit_remaining,
+            )
             return response
         except httpx.HTTPStatusError as e:
+            logger.error("github_api_error", method="GET", path=path, status=e.response.status_code)
             _handle_http_error(e)
         except httpx.RequestError as e:
+            logger.error("github_api_connection_failed", method="GET", path=path, error=str(e))
             raise ValueError(f"GitHub API connection failed: {e}") from e
 
     @retry(
@@ -104,13 +125,17 @@ class GitHubClient:
     )
     def put(self, path: str, payload: dict | None = None) -> httpx.Response:
         try:
+            logger.info("github_api_request", method="PUT", path=path)
             response = self._client.put(f"{self.base_url}{path}", json=payload)
             self._update_rate_limits(response)
             response.raise_for_status()
+            logger.info("github_api_success", method="PUT", path=path, status=response.status_code)
             return response
         except httpx.HTTPStatusError as e:
+            logger.error("github_api_error", method="PUT", path=path, status=e.response.status_code)
             _handle_http_error(e)
         except httpx.RequestError as e:
+            logger.error("github_api_connection_failed", method="PUT", path=path, error=str(e))
             raise ValueError(f"GitHub API connection failed: {e}") from e
 
     def close(self) -> None:

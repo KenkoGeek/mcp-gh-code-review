@@ -7,11 +7,15 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any
 
+import structlog
+
 from .actions import GitHubClient
 from .bot_detector import is_bot
 from .graphql_client import GitHubGraphQLClient
 from .jsonrpc import JSONRPCServer
 from .schemas import SubmitPendingReviewRequest, schema_for
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -54,6 +58,7 @@ class MCPServer:
         """Get PR with threads (GraphQL) + reviews (REST)."""
         pr_number = params["pr_number"]
         owner, repo = self._get_repo()
+        logger.info("review_pr_start", pr_number=pr_number, owner=owner, repo=repo)
         
         # Get authenticated user
         user_response = self.client.get("/user")
@@ -76,6 +81,12 @@ class MCPServer:
                     author["is_bot"] = is_bot(login)
                     author["is_me"] = login == authenticated_user
         
+        logger.info(
+            "review_pr_complete",
+            pr_number=pr_number,
+            threads_count=threads_data.get("count", 0),
+            authenticated_user=authenticated_user,
+        )
         return {
             "pr_info": pr_response.json(),
             "reviews": reviews_response.json(),
@@ -97,10 +108,13 @@ class MCPServer:
         reply_text = params["reply_text"]
         owner, repo = self._get_repo()
         
+        logger.info("reply_to_comment", pr_number=pr_number, comment_id=database_id, owner=owner, repo=repo)
+        
         path = f"/repos/{owner}/{repo}/pulls/{pr_number}/comments"
         payload = {"body": reply_text, "in_reply_to": database_id}
         
         self.client.post(path, payload=payload)
+        logger.info("reply_to_comment_success", pr_number=pr_number, comment_id=database_id)
         return {"success": True}
     
     async def get_review_threads(self, params: dict[str, Any]) -> dict[str, Any]:
