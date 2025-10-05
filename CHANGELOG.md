@@ -1,3 +1,11 @@
+## [1.1.1](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.1.0...v1.1.1) (2025-10-05)
+
+
+### Bug Fixes
+
+* **ci:** correct CodeQL check name to 'Analyze (python)' ([f7e5c83](https://github.com/KenkoGeek/mcp-gh-code-review/commit/f7e5c834fe7bdecc314578ceebe5de72fb81e6aa))
+* **ci:** restore push/PR triggers, add CodeQL check before release ([f09930e](https://github.com/KenkoGeek/mcp-gh-code-review/commit/f09930ec859227828ca6febd37dac96b2f58a96c))
+
 # [1.1.0](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.0.0...v1.1.0) (2025-10-05)
 
 
