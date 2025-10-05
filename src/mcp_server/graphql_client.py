@@ -27,16 +27,32 @@ class GitHubGraphQLClient:
         if variables:
             payload["variables"] = variables
         
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.base_url,
-                headers=self.headers,
-                json=payload,
-                timeout=30.0
-            )
-            response.raise_for_status()
-            result: dict[str, Any] = response.json()
-            return result
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    self.base_url,
+                    headers=self.headers,
+                    json=payload,
+                    timeout=30.0
+                )
+                response.raise_for_status()
+                result: dict[str, Any] = response.json()
+                
+                if "errors" in result:
+                    error_msg = result["errors"][0].get("message", "Unknown GraphQL error")
+                    raise ValueError(f"GraphQL error: {error_msg}")
+                
+                return result
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 401:
+                raise ValueError("Invalid GitHub token") from e
+            if e.response.status_code == 404:
+                raise ValueError("Resource not found") from e
+            if e.response.status_code == 403:
+                raise ValueError("GitHub API rate limit exceeded or forbidden") from e
+            raise ValueError(f"GitHub API error: {e.response.status_code}") from e
+        except httpx.RequestError as e:
+            raise ValueError(f"GitHub API connection failed: {e}") from e
     
     async def get_pending_reviews(self, owner: str, repo: str, pr_number: int) -> dict[str, Any]:
         """Get pending reviews with inline comments."""
