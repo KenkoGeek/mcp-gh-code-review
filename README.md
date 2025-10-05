@@ -100,20 +100,31 @@ uvicorn mcp_server.webhooks:app --host 0.0.0.0 --port 8000 --workers 4
 
 ### 3. Docker Deployment
 
-**Build:**
-```bash
-docker build -t mcp-gh-review .
-```
+**Using pre-built image from GitHub Container Registry:**
 
-**Run MCP server:**
 ```bash
+# MCP server
 docker run -i \
   -e GITHUB_TOKEN=ghp_xxx \
-  mcp-gh-review
+  ghcr.io/kenkogeek/mcp-gh-code-review:latest
+
+# Webhook server
+docker run -p 8000:8000 \
+  -e GITHUB_TOKEN=ghp_xxx \
+  -e WEBHOOK_SECRET=your_secret \
+  ghcr.io/kenkogeek/mcp-gh-code-review:latest \
+  uvicorn mcp_server.webhooks:app --host 0.0.0.0
 ```
 
-**Run webhook server:**
+**Build locally:**
+
 ```bash
+docker build -t mcp-gh-review .
+
+# Run MCP server
+docker run -i -e GITHUB_TOKEN=ghp_xxx mcp-gh-review
+
+# Run webhook server
 docker run -p 8000:8000 \
   -e GITHUB_TOKEN=ghp_xxx \
   -e WEBHOOK_SECRET=your_secret \

@@ -1,3 +1,23 @@
+# 1.0.0 (2025-10-05)
+
+
+### Bug Fixes
+
+* **ci:** add permissions to codeql job call ([e92e369](https://github.com/KenkoGeek/mcp-gh-code-review/commit/e92e369aac0e35584db57c76905efa5ccd3952f4))
+* **ci:** add permissions to codeql job call ([e9f623e](https://github.com/KenkoGeek/mcp-gh-code-review/commit/e9f623ebd382ab8e90e067f5cb25ffd4dad171a6))
+* **ci:** add permissions to codeql job call ([d3a1b40](https://github.com/KenkoGeek/mcp-gh-code-review/commit/d3a1b40e98c9966546f84946dc31ba57e5e166e5))
+* **ci:** add permissions to codeql job call ([f25fa3a](https://github.com/KenkoGeek/mcp-gh-code-review/commit/f25fa3a0938d111a8618a7b47e2e3122780ddff9))
+* **ci:** add permissions to codeql job call ([40939a2](https://github.com/KenkoGeek/mcp-gh-code-review/commit/40939a28dce5b8d8373d9ac1586f0328a2403eb7))
+* **ci:** add security-events permission to ci job call ([3c24c4b](https://github.com/KenkoGeek/mcp-gh-code-review/commit/3c24c4b7321e75005714e31abef94dfd784f8861))
+* **ci:** remove npm cache from setup-node ([9863cb9](https://github.com/KenkoGeek/mcp-gh-code-review/commit/9863cb93c805ab79eaf2c3eb3f02c59136e8ff86))
+* **ci:** resolve concurrency deadlock between release and ci workflows ([55726a3](https://github.com/KenkoGeek/mcp-gh-code-review/commit/55726a366261f8a4629ccf352d9bb1c70d6c4eed))
+* **ci:** use RELEASE_TOKEN to bypass branch protection ([eb48e2a](https://github.com/KenkoGeek/mcp-gh-code-review/commit/eb48e2a828824cc765a583974cbf57adea85c57c))
+
+
+### Features
+
+* **server:** Build mcp server for GitHub reviews ([0526b65](https://github.com/KenkoGeek/mcp-gh-code-review/commit/0526b655646d5c77ccd3ffc836991a5e3238d657))
+
 # Changelog
 
 All notable changes to this project will be documented in this file.
