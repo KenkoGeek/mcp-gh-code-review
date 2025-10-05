@@ -4,12 +4,9 @@ A production-focused Model Context Protocol (MCP) server for automating GitHub p
 
 ## Features
 
-- **7 JSON-RPC Tools** - Comprehensive PR review, pending review management, apply actions, generate replies, health checks, policy updates
-- **Bot Detection** - Deterministic classifier with configurable patterns and caching
+- **5 JSON-RPC Tools** - PR review, inline comment replies, review threads, pending reviews, health checks
 - **Webhook Integration** - FastAPI endpoint with GitHub signature verification
-- **Idempotent Storage** - SQLite-backed thread mappings for retry safety
-- **Policy Engine** - YAML-driven triage rules for labels, assignments, and automation
-- **Comprehensive Tests** - 14 tests covering all core functionality
+- **Minimal Tests** - 3 tests covering core functionality
 
 ## Quick Start
 
@@ -46,11 +43,6 @@ cp .env.example .env
 - `repo` scope - Full repository access
 
 **Optional:**
-- `BOT_ACTORS` - Comma-separated bot patterns (extends defaults)
-- `POLICY_PATH` - Path to policy YAML file (default: none)
-- `DB_PATH` - SQLite database path (default: `.mcp/threads.db`)
-- `DRY_RUN` - Test mode without GitHub writes (default: `false`)
-- `LOG_LEVEL` - Logging level (default: `INFO`)
 - `WEBHOOK_SECRET` - Secret for webhook signature verification
 
 ## Usage
@@ -67,8 +59,7 @@ Connect from Claude Desktop, IDEs, or any MCP-compatible client.
       "command": "/path/to/.venv/bin/python",
       "args": ["-m", "mcp_server.cli", "--stdio"],
       "env": {
-        "GITHUB_TOKEN": "ghp_your_token_here",
-        "POLICY_PATH": "/path/to/policy.yaml"
+        "GITHUB_TOKEN": "ghp_your_token_here"
       }
     }
   }
@@ -111,9 +102,6 @@ docker build -t mcp-gh-review .
 ```bash
 docker run -i \
   -e GITHUB_TOKEN=ghp_xxx \
-  -e POLICY_PATH=/app/config/policy.yaml \
-  -v $(pwd)/config:/app/config \
-  -v $(pwd)/data:/data \
   mcp-gh-review
 ```
 
@@ -130,45 +118,13 @@ docker run -p 8000:8000 \
 
 | Tool | Description |
 |------|-------------|
-| `review_pr` | Comprehensive PR analysis with conversation threads and priority actions |
-| `get_pending_reviews` | Retrieve pending reviews with inline comments via GraphQL |
+| `review_pr` | Comprehensive PR analysis with reviews, comments, and threads |
+| `reply_to_comment` | Reply to inline PR comments using databaseId |
+| `get_review_threads` | Get review threads with isResolved status via GraphQL |
 | `submit_pending_review` | Submit pending reviews with specified event type |
-| `apply_actions` | Execute GitHub API actions (comment, label, assign) |
-| `generate_reply` | Create context-aware responses for comments |
-| `set_policy` | Update triage policy at runtime |
-| `health` | Check server status, database, and rate limits |
+| `health` | Check server status and GitHub API rate limits |
 
-## Policy Configuration
 
-Create `config/policy.yaml` to define triage rules:
-
-```yaml
-# Auto-label based on file paths
-labels:
-  src/frontend/: [frontend, ui]
-  src/backend/: [backend, api]
-  tests/: [testing]
-  docs/: [documentation]
-
-# Auto-assign reviewers by path
-owners:
-  src/auth/: [security-team]
-  src/database/: [db-team]
-
-# Paths that can be auto-approved
-auto_approve_paths:
-  - docs/
-  - README.md
-  - "*.md"
-
-# Protected paths requiring specific reviewers
-protected_paths:
-  src/security/: [security-lead]
-  config/production/: [ops-team]
-
-# SLA for review responses (hours)
-sla_hours: 24
-```
 
 ## Development
 
@@ -192,9 +148,7 @@ mypy src/
 See [docs/architecture.md](docs/architecture.md) for detailed component diagrams and data flow.
 
 ```
-GitHub Webhooks → FastAPI → Triage Engine → Responder/Actions → Storage
-                              ↓
-                    Actor Classifier + Policy
+GitHub Webhooks → FastAPI → MCP Server → GitHub REST/GraphQL APIs
 ```
 
 ## Monitoring
@@ -232,26 +186,11 @@ curl http://localhost:8000/health
 
 ## Troubleshooting
 
-**Database locked errors:**
-```bash
-# Check database path permissions
-ls -la .mcp/threads.db
-# Set DB_PATH to writable location
-export DB_PATH=/tmp/threads.db
-```
-
 **Rate limit exceeded:**
 ```bash
 # Check current limits
 curl http://localhost:8000/health | jq .rate_limit
 # Use GitHub App for higher limits (5000/hour)
-```
-
-**Dry-run mode:**
-```bash
-# Test without making GitHub API calls
-export DRY_RUN=true
-python -m mcp_server.cli --stdio
 ```
 
 ## Contributing
