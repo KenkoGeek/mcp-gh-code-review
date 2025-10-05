@@ -81,7 +81,13 @@ class MCPServer:
             "reviews": reviews_response.json(),
             "threads": threads,
             "threads_count": threads_data.get("count", 0),
-            "authenticated_user": authenticated_user
+            "authenticated_user": authenticated_user,
+            "_guidance": (
+                "When replying: "
+                "is_bot=true → short replies (1-2 lines, e.g. '✅ LGTM'), "
+                "is_bot=false → detailed replies, "
+                "is_me=true → skip (your own comments)"
+            )
         }
     
     async def reply_to_comment(self, params: dict[str, Any]) -> dict[str, Any]:
