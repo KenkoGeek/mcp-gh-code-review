@@ -33,26 +33,38 @@ class MCPServer:
         return cls(token=token, client=client, graphql=graphql)
     
     def _get_repo(self) -> tuple[str, str]:
-        """Get owner/repo from git remote."""
+        """Get owner/repo from git remote or env var."""
+        # Try env var first (GITHUB_REPOSITORY=owner/repo)
+        env_repo = os.environ.get("GITHUB_REPOSITORY")
+        if env_repo and "/" in env_repo:
+            parts = env_repo.split("/", 1)
+            return parts[0], parts[1]
+        
+        # Find .git directory by walking up from cwd
         import subprocess
-        result = subprocess.run(
-            ["git", "remote", "get-url", "origin"],
-            capture_output=True, text=True, timeout=5
+        from pathlib import Path
+        
+        current = Path.cwd()
+        for parent in [current, *current.parents]:
+            if (parent / ".git").exists():
+                result = subprocess.run(
+                    ["git", "remote", "get-url", "origin"],
+                    cwd=parent, capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    url = result.stdout.strip()
+                    if "github.com" in url:
+                        if url.startswith("git@"):
+                            parts = url.split(":")[1].replace(".git", "").split("/")
+                        else:
+                            parts = url.split("/")[-2:]
+                            parts[1] = parts[1].replace(".git", "")
+                        return parts[0], parts[1]
+        
+        raise ValueError(
+            "Could not detect GitHub repository. "
+            "Set GITHUB_REPOSITORY=owner/repo environment variable or run from a git repository."
         )
-        if result.returncode != 0:
-            raise ValueError("Not in a git repository")
-        
-        url = result.stdout.strip()
-        if "github.com" not in url:
-            raise ValueError("Not a GitHub repository")
-        
-        if url.startswith("git@"):
-            parts = url.split(":")[1].replace(".git", "").split("/")
-        else:
-            parts = url.split("/")[-2:]
-            parts[1] = parts[1].replace(".git", "")
-        
-        return parts[0], parts[1]
     
     async def review_pr(self, params: dict[str, Any]) -> dict[str, Any]:
         """Get PR with threads (GraphQL) + reviews (REST)."""
