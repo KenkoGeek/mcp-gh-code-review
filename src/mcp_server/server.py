@@ -77,7 +77,8 @@ class MCPServer:
         
         raise ValueError(
             "Could not detect GitHub repository. "
-            "Set GITHUB_REPOSITORY=owner/repo environment variable or run from a git repository with GitHub remote."
+            "Set GITHUB_REPOSITORY=owner/repo environment variable or run from a git repository " \
+            "with GitHub remote."
         )
     
     async def review_pr(self, params: dict[str, Any]) -> dict[str, Any]:
