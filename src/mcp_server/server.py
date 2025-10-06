@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import structlog
 
@@ -38,32 +41,43 @@ class MCPServer:
         env_repo = os.environ.get("GITHUB_REPOSITORY")
         if env_repo and "/" in env_repo:
             parts = env_repo.split("/", 1)
-            return parts[0], parts[1]
+            if len(parts) == 2 and parts[0].strip() and parts[1].strip():
+                return parts[0].strip(), parts[1].strip()
+            raise ValueError(
+                f"Invalid GITHUB_REPOSITORY format: '{env_repo}'. "
+                "Expected format: 'owner/repo'"
+            )
         
         # Find .git directory by walking up from cwd
-        import subprocess
-        from pathlib import Path
-        
         current = Path.cwd()
         for parent in [current, *current.parents]:
             if (parent / ".git").exists():
-                result = subprocess.run(
-                    ["git", "remote", "get-url", "origin"],
-                    cwd=parent, capture_output=True, text=True, timeout=5
-                )
+                try:
+                    result = subprocess.run(
+                        ["git", "remote", "get-url", "origin"],
+                        cwd=parent, capture_output=True, text=True, timeout=5
+                    )
+                except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
+                    continue
+                
                 if result.returncode == 0:
                     url = result.stdout.strip()
-                    if "github.com" in url:
-                        if url.startswith("git@"):
-                            parts = url.split(":")[1].replace(".git", "").split("/")
-                        else:
-                            parts = url.split("/")[-2:]
-                            parts[1] = parts[1].replace(".git", "")
-                        return parts[0], parts[1]
+                    if url.startswith("git@github.com:"):
+                        # SSH format: git@github.com:owner/repo.git
+                        parts = url.split(":")[1].replace(".git", "").split("/")
+                        if len(parts) >= 2 and parts[0] and parts[1]:
+                            return parts[0], parts[1]
+                    else:
+                        # HTTPS format
+                        parsed = urlparse(url)
+                        if parsed.netloc == "github.com":
+                            path_parts = parsed.path.strip("/").replace(".git", "").split("/")
+                            if len(path_parts) >= 2 and path_parts[0] and path_parts[1]:
+                                return path_parts[0], path_parts[1]
         
         raise ValueError(
             "Could not detect GitHub repository. "
-            "Set GITHUB_REPOSITORY=owner/repo environment variable or run from a git repository."
+            "Set GITHUB_REPOSITORY=owner/repo environment variable or run from a git repository with GitHub remote."
         )
     
     async def review_pr(self, params: dict[str, Any]) -> dict[str, Any]:
