@@ -62,6 +62,7 @@ class MCPServer:
                                 if len(path_parts) >= 2 and path_parts[0] and path_parts[1]:
                                     return path_parts[0], path_parts[1]
                 except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
+                    # Git command failed - continue to env var fallback
                     pass
                 break
             if current.parent == current:
