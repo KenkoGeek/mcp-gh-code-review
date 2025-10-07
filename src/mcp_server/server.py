@@ -28,85 +28,60 @@ class MCPServer:
     token: str
     client: GitHubClient
     graphql: GitHubGraphQLClient
-    _roots_cache: list[str] | None = None
     
     @classmethod
     def create(cls, token: str) -> MCPServer:
         client = GitHubClient(token=token)
         graphql = GitHubGraphQLClient(token=token)
-        return cls(token=token, client=client, graphql=graphql, _roots_cache=None)
+        return cls(token=token, client=client, graphql=graphql)
     
-    async def _get_mcp_roots(self) -> list[str]:
-        """Get workspace roots from MCP client."""
-        if self._roots_cache is not None:
-            return self._roots_cache
+    def _get_repo(self) -> tuple[str, str]:
+        """Get owner/repo from git remote or GITHUB_REPOSITORY env var."""
+        # Try git remote first - search from source file location
+        source_dir = Path(__file__).parent.parent.parent  # src/mcp_server/server.py -> repo root
         
-        try:
-            # Send roots/list request via stdin/stdout
-            import json
-            import sys
-            request = {"jsonrpc": "2.0", "id": "roots-req", "method": "roots/list"}
-            sys.stdout.write(json.dumps(request) + "\n")
-            sys.stdout.flush()
-            
-            # Read response (simplified - in production would need proper JSON-RPC handling)
-            response_line = sys.stdin.readline()
-            if response_line:
-                response = json.loads(response_line)
-                if "result" in response and "roots" in response["result"]:
-                    roots = [r["uri"].replace("file://", "") for r in response["result"]["roots"]]
-                    self._roots_cache = roots
-                    return roots
-        except Exception as e:
-            logger.debug("mcp_roots_failed", error=str(e))
-        
-        return []
-    
-    async def _get_repo(self) -> tuple[str, str]:
-        """Get owner/repo from MCP roots, env var, or cwd."""
-        # Try MCP roots first
-        roots = await self._get_mcp_roots()
-        for root_path in roots:
-            root = Path(root_path)
-            if (root / ".git").exists():
+        # Search for .git starting from source directory
+        current = source_dir
+        for _ in range(10):  # Limit search depth
+            if (current / ".git").exists():
                 try:
                     result = subprocess.run(
                         ["git", "remote", "get-url", "origin"],
-                        cwd=root, capture_output=True, text=True, timeout=5
+                        cwd=current, capture_output=True, text=True, timeout=5
                     )
+                    if result.returncode == 0:
+                        url = result.stdout.strip()
+                        if url.startswith("git@github.com:"):
+                            parts = url.split(":")[1].replace(".git", "").split("/")
+                            if len(parts) >= 2 and parts[0] and parts[1]:
+                                return parts[0], parts[1]
+                        else:
+                            parsed = urlparse(url)
+                            if parsed.netloc == "github.com":
+                                path_parts = parsed.path.strip("/").replace(".git", "").split("/")
+                                if len(path_parts) >= 2 and path_parts[0] and path_parts[1]:
+                                    return path_parts[0], path_parts[1]
                 except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
-                    continue
-                
-                if result.returncode == 0:
-                    url = result.stdout.strip()
-                    if url.startswith("git@github.com:"):
-                        parts = url.split(":")[1].replace(".git", "").split("/")
-                        if len(parts) >= 2 and parts[0] and parts[1]:
-                            logger.info("repo_detected_from_mcp_roots", root=str(root), owner=parts[0], repo=parts[1])
-                            return parts[0], parts[1]
-                    else:
-                        parsed = urlparse(url)
-                        if parsed.netloc == "github.com":
-                            path_parts = parsed.path.strip("/").replace(".git", "").split("/")
-                            if len(path_parts) >= 2 and path_parts[0] and path_parts[1]:
-                                logger.info("repo_detected_from_mcp_roots", root=str(root), owner=path_parts[0], repo=path_parts[1])
-                                return path_parts[0], path_parts[1]
+                    pass
+                break
+            if current.parent == current:
+                break
+            current = current.parent
         
-        # Fallback to env var (GITHUB_REPOSITORY=owner/repo)
+        # Fallback to env var
         env_repo = os.environ.get("GITHUB_REPOSITORY")
         if env_repo and "/" in env_repo:
             parts = env_repo.split("/", 1)
             if len(parts) == 2 and parts[0].strip() and parts[1].strip():
-                logger.info("repo_detected_from_env_var", owner=parts[0], repo=parts[1])
                 return parts[0].strip(), parts[1].strip()
             raise ValueError(
                 f"Invalid GITHUB_REPOSITORY format: '{env_repo}'. "
-                "Expected format: 'owner/repo'"
+                "Expected format: 'owner/repo' (e.g., KenkoGeek/mcp-gh-code-review)"
             )
         
         raise ValueError(
             "Could not detect GitHub repository. "
-            "MCP client must expose workspace roots or set GITHUB_REPOSITORY=owner/repo environment variable."
+            "Either run from a git repository with GitHub remote or set GITHUB_REPOSITORY=owner/repo"
         )
     
     async def review_pr(self, params: dict[str, Any]) -> dict[str, Any]:
