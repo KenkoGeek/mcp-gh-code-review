@@ -1,3 +1,10 @@
+## [1.1.3](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.1.2...v1.1.3) (2025-10-07)
+
+
+### Bug Fixes
+
+* **server:** improve git detection with parent directory search and e… ([#18](https://github.com/KenkoGeek/mcp-gh-code-review/issues/18)) ([3243e2c](https://github.com/KenkoGeek/mcp-gh-code-review/commit/3243e2c0f777caadb115d9449e7bdb37a2172a89))
+
 ## [1.1.2](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.1.1...v1.1.2) (2025-10-05)
 
 
