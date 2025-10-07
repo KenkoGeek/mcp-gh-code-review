@@ -44,6 +44,7 @@ cp .env.example .env
 
 **Required:**
 - `GITHUB_TOKEN` - GitHub personal access token with minimal permissions (see below)
+- `GITHUB_REPOSITORY` - Repository in format `owner/repo` (optional if running from git repository with GitHub remote)
 
 **GitHub Token Permissions:**
 
@@ -59,6 +60,7 @@ cp .env.example .env
 
 **Optional:**
 - `WEBHOOK_SECRET` - Secret for webhook signature verification
+- `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
 
 ## Usage
 
@@ -80,7 +82,8 @@ Connect from Claude Desktop, IDEs, or any MCP-compatible client.
         "mcp-gh-review"
       ],
       "env": {
-        "GITHUB_TOKEN": "ghp_your_token_here"
+        "GITHUB_TOKEN": "ghp_your_token_here",
+        "GITHUB_REPOSITORY": "owner/repo"
       }
     }
   }
@@ -95,7 +98,8 @@ Connect from Claude Desktop, IDEs, or any MCP-compatible client.
       "command": "/path/to/.venv/bin/python",
       "args": ["-m", "mcp_server.cli", "--stdio"],
       "env": {
-        "GITHUB_TOKEN": "ghp_your_token_here"
+        "GITHUB_TOKEN": "ghp_your_token_here",
+        "GITHUB_REPOSITORY": "owner/repo"
       }
     }
   }
