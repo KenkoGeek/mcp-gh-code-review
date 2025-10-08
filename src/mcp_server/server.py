@@ -88,7 +88,6 @@ class MCPServer:
                     except (OSError, Exception) as e:
                         # Config parsing failed - continue to git command fallback
                         logger.debug("git_config_parse_failed", error=str(e))
-                        pass
 
                 try:
                     result = subprocess.run(
