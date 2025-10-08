@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import os
+import subprocess
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import structlog
 
@@ -33,26 +36,54 @@ class MCPServer:
         return cls(token=token, client=client, graphql=graphql)
     
     def _get_repo(self) -> tuple[str, str]:
-        """Get owner/repo from git remote."""
-        import subprocess
-        result = subprocess.run(
-            ["git", "remote", "get-url", "origin"],
-            capture_output=True, text=True, timeout=5
+        """Get owner/repo from git remote or GITHUB_REPOSITORY env var."""
+        # Try git remote first - search from source file location
+        source_dir = Path(__file__).parent.parent.parent  # src/mcp_server/server.py -> repo root
+        
+        # Search for .git starting from source directory
+        current = source_dir
+        for _ in range(10):  # Limit search depth
+            if (current / ".git").exists():
+                try:
+                    result = subprocess.run(
+                        ["git", "remote", "get-url", "origin"],
+                        cwd=current, capture_output=True, text=True, timeout=5
+                    )
+                    if result.returncode == 0:
+                        url = result.stdout.strip()
+                        if url.startswith("git@github.com:"):
+                            parts = url.split(":")[1].replace(".git", "").split("/")
+                            if len(parts) >= 2 and parts[0] and parts[1]:
+                                return parts[0], parts[1]
+                        else:
+                            parsed = urlparse(url)
+                            if parsed.netloc == "github.com":
+                                path_parts = parsed.path.strip("/").replace(".git", "").split("/")
+                                if len(path_parts) >= 2 and path_parts[0] and path_parts[1]:
+                                    return path_parts[0], path_parts[1]
+                except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
+                    # Git command failed - continue to env var fallback
+                    pass
+                break
+            if current.parent == current:
+                break
+            current = current.parent
+        
+        # Fallback to env var
+        env_repo = os.environ.get("GITHUB_REPOSITORY")
+        if env_repo and "/" in env_repo:
+            parts = env_repo.split("/", 1)
+            if len(parts) == 2 and parts[0].strip() and parts[1].strip():
+                return parts[0].strip(), parts[1].strip()
+            raise ValueError(
+                f"Invalid GITHUB_REPOSITORY format: '{env_repo}'. "
+                "Expected format: 'owner/repo' (e.g., KenkoGeek/mcp-gh-code-review)"
+            )
+        
+        raise ValueError(
+            "Could not detect GitHub repository. "
+            "Either run from a git repository with GitHub remote or set GITHUB_REPOSITORY=owner/repo"
         )
-        if result.returncode != 0:
-            raise ValueError("Not in a git repository")
-        
-        url = result.stdout.strip()
-        if "github.com" not in url:
-            raise ValueError("Not a GitHub repository")
-        
-        if url.startswith("git@"):
-            parts = url.split(":")[1].replace(".git", "").split("/")
-        else:
-            parts = url.split("/")[-2:]
-            parts[1] = parts[1].replace(".git", "")
-        
-        return parts[0], parts[1]
     
     async def review_pr(self, params: dict[str, Any]) -> dict[str, Any]:
         """Get PR with threads (GraphQL) + reviews (REST)."""
