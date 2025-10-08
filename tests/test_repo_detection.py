@@ -9,10 +9,34 @@ from mcp_server.server import MCPServer
 
 
 @pytest.mark.parametrize(
+    "url, expected",
+    [
+        ("git@github.com:owner/repo.git", ("owner", "repo")),
+        ("https://github.com/owner/repo.git", ("owner", "repo")),
+        ("git@github.com:owner/repo", ("owner", "repo")),
+        ("https://github.com/owner/repo", ("owner", "repo")),
+        ("git@github.com:owner/repo/extra/path.git", None),  # Invalid: extra path
+        ("https://example.com/owner/repo.git", None),  # Wrong host
+        ("", None),  # Empty
+        ("invalid-url", None),  # Malformed
+        ("git@github.com:owner", None),  # Missing repo
+        ("https://github.com/owner", None),  # Missing repo
+    ],
+)
+def test_parse_repo_from_url(url, expected):
+    """Test URL parsing with edge cases."""
+    result = MCPServer._parse_repo_from_url(url)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
     "remote_url, expected",
     [
         ("git@github.com:owner/repo.git", ("owner", "repo")),
         ("https://github.com/owner/repo.git", ("owner", "repo")),
+        ("git@github.com:owner/repo", ("owner", "repo")),  # No .git suffix
+        ("https://github.com/owner/repo", ("owner", "repo")),  # No .git suffix
+        ("https://github.com/owner/repo/", ("owner", "repo")),  # Trailing slash
     ],
 )
 def test_get_repo_reads_git_config(monkeypatch, tmp_path, remote_url, expected):

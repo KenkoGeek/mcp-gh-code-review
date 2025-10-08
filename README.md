@@ -44,7 +44,7 @@ cp .env.example .env
 
 **Required:**
 - `GITHUB_TOKEN` - GitHub personal access token with minimal permissions (see below)
-- `GITHUB_REPOSITORY` - Repository in format `owner/repo` (optional when running inside a git repository with a GitHub remote; the server now reads `.git/config` to detect the owner and repo automatically)
+- `GITHUB_REPOSITORY` - Repository in format `owner/repo` (optional when running inside a git repository with a GitHub remote; the server reads `.git/config` automatically. If both are present, git detection takes precedence)
 
 **GitHub Token Permissions:**
 
