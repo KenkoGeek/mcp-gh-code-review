@@ -36,8 +36,40 @@ class MCPServer:
         return cls(token=token, client=client, graphql=graphql)
     
     def _get_repo(self) -> tuple[str, str]:
-        """Get owner/repo from git remote or env var."""
-        # Try env var first (GITHUB_REPOSITORY=owner/repo)
+        """Get owner/repo from git remote or GITHUB_REPOSITORY env var."""
+        # Try git remote first - search from source file location
+        source_dir = Path(__file__).parent.parent.parent  # src/mcp_server/server.py -> repo root
+        
+        # Search for .git starting from source directory
+        current = source_dir
+        for _ in range(10):  # Limit search depth
+            if (current / ".git").exists():
+                try:
+                    result = subprocess.run(
+                        ["git", "remote", "get-url", "origin"],
+                        cwd=current, capture_output=True, text=True, timeout=5
+                    )
+                    if result.returncode == 0:
+                        url = result.stdout.strip()
+                        if url.startswith("git@github.com:"):
+                            parts = url.split(":")[1].replace(".git", "").split("/")
+                            if len(parts) >= 2 and parts[0] and parts[1]:
+                                return parts[0], parts[1]
+                        else:
+                            parsed = urlparse(url)
+                            if parsed.netloc == "github.com":
+                                path_parts = parsed.path.strip("/").replace(".git", "").split("/")
+                                if len(path_parts) >= 2 and path_parts[0] and path_parts[1]:
+                                    return path_parts[0], path_parts[1]
+                except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
+                    # Git command failed - continue to env var fallback
+                    pass
+                break
+            if current.parent == current:
+                break
+            current = current.parent
+        
+        # Fallback to env var
         env_repo = os.environ.get("GITHUB_REPOSITORY")
         if env_repo and "/" in env_repo:
             parts = env_repo.split("/", 1)
@@ -45,40 +77,12 @@ class MCPServer:
                 return parts[0].strip(), parts[1].strip()
             raise ValueError(
                 f"Invalid GITHUB_REPOSITORY format: '{env_repo}'. "
-                "Expected format: 'owner/repo'"
+                "Expected format: 'owner/repo' (e.g., KenkoGeek/mcp-gh-code-review)"
             )
-        
-        # Find .git directory by walking up from cwd
-        current = Path.cwd()
-        for parent in [current, *current.parents]:
-            if (parent / ".git").exists():
-                try:
-                    result = subprocess.run(
-                        ["git", "remote", "get-url", "origin"],
-                        cwd=parent, capture_output=True, text=True, timeout=5
-                    )
-                except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
-                    continue
-                
-                if result.returncode == 0:
-                    url = result.stdout.strip()
-                    if url.startswith("git@github.com:"):
-                        # SSH format: git@github.com:owner/repo.git
-                        parts = url.split(":")[1].replace(".git", "").split("/")
-                        if len(parts) >= 2 and parts[0] and parts[1]:
-                            return parts[0], parts[1]
-                    else:
-                        # HTTPS format
-                        parsed = urlparse(url)
-                        if parsed.netloc == "github.com":
-                            path_parts = parsed.path.strip("/").replace(".git", "").split("/")
-                            if len(path_parts) >= 2 and path_parts[0] and path_parts[1]:
-                                return path_parts[0], path_parts[1]
         
         raise ValueError(
             "Could not detect GitHub repository. "
-            "Set GITHUB_REPOSITORY=owner/repo environment variable or run from a git repository " \
-            "with GitHub remote."
+            "Either run from a git repository with GitHub remote or set GITHUB_REPOSITORY=owner/repo"
         )
     
     async def review_pr(self, params: dict[str, Any]) -> dict[str, Any]:
