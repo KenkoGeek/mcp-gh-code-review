@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.1.3...v1.2.0) (2025-10-08)
+
+
+### Features
+
+* **server:** add MCP roots support with env var fallback ([#19](https://github.com/KenkoGeek/mcp-gh-code-review/issues/19)) ([718ef9d](https://github.com/KenkoGeek/mcp-gh-code-review/commit/718ef9d558400d2868e911b3cef9fe9c52ba7a57))
+
 ## [1.1.3](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.1.2...v1.1.3) (2025-10-07)
 
 
