@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import subprocess
 from collections.abc import Callable, Coroutine
+from configparser import ConfigParser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -34,16 +35,50 @@ class MCPServer:
         client = GitHubClient(token=token)
         graphql = GitHubGraphQLClient(token=token)
         return cls(token=token, client=client, graphql=graphql)
-    
+
+    @staticmethod
+    def _parse_repo_from_url(url: str) -> tuple[str, str] | None:
+        if not url:
+            return None
+
+        url = url.strip()
+        if url.startswith("git@github.com:"):
+            parts = url.split(":", 1)[1].rsplit(".git", 1)[0].split("/")
+            if len(parts) >= 2 and parts[0] and parts[1]:
+                return parts[0], parts[1]
+            return None
+
+        parsed = urlparse(url)
+        if parsed.netloc == "github.com":
+            path_parts = parsed.path.strip("/").rsplit(".git", 1)[0].split("/")
+            if len(path_parts) >= 2 and path_parts[0] and path_parts[1]:
+                return path_parts[0], path_parts[1]
+
+        return None
+
     def _get_repo(self) -> tuple[str, str]:
         """Get owner/repo from git remote or GITHUB_REPOSITORY env var."""
         # Try git remote first - search from source file location
         source_dir = Path(__file__).parent.parent.parent  # src/mcp_server/server.py -> repo root
-        
+
         # Search for .git starting from source directory
         current = source_dir
         for _ in range(10):  # Limit search depth
             if (current / ".git").exists():
+                config_path = current / ".git" / "config"
+                if config_path.exists():
+                    try:
+                        config = ConfigParser()
+                        config.read(config_path)
+                        section = 'remote "origin"'
+                        if config.has_section(section):
+                            url = config.get(section, "url", fallback="").strip()
+                            parsed = self._parse_repo_from_url(url)
+                            if parsed:
+                                return parsed
+                    except OSError:
+                        pass
+
                 try:
                     result = subprocess.run(
                         ["git", "remote", "get-url", "origin"],
@@ -51,16 +86,9 @@ class MCPServer:
                     )
                     if result.returncode == 0:
                         url = result.stdout.strip()
-                        if url.startswith("git@github.com:"):
-                            parts = url.split(":")[1].replace(".git", "").split("/")
-                            if len(parts) >= 2 and parts[0] and parts[1]:
-                                return parts[0], parts[1]
-                        else:
-                            parsed = urlparse(url)
-                            if parsed.netloc == "github.com":
-                                path_parts = parsed.path.strip("/").replace(".git", "").split("/")
-                                if len(path_parts) >= 2 and path_parts[0] and path_parts[1]:
-                                    return path_parts[0], path_parts[1]
+                        parsed = self._parse_repo_from_url(url)
+                        if parsed:
+                            return parsed
                 except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
                     # Git command failed - continue to env var fallback
                     pass
