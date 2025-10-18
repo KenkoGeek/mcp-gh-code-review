@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import NoReturn
+import weakref
 
 import httpx
 import structlog
@@ -29,16 +30,18 @@ def _handle_http_error(e: httpx.HTTPStatusError) -> NoReturn:
     raise ValueError(f"GitHub API error ({e.response.status_code}): {gh_message}") from e
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, weakref_slot=True)
 class GitHubClient:
     token: str
     base_url: str = "https://api.github.com"
     _client: httpx.Client = field(init=False, repr=False)
+    _finalizer: weakref.finalize | None = field(init=False, repr=False, default=None)
     rate_limit_remaining: int = field(default=5000, init=False)
     rate_limit_reset: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
         self._client = httpx.Client(timeout=10.0, headers=self._headers())
+        self._finalizer = weakref.finalize(self, self._client.close)
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -139,7 +142,15 @@ class GitHubClient:
             raise ValueError(f"GitHub API connection failed: {e}") from e
 
     def close(self) -> None:
+        if self._finalizer and self._finalizer.alive:
+            self._finalizer.detach()
         self._client.close()
+
+    def __enter__(self) -> "GitHubClient":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
 
 __all__ = ["GitHubClient"]

@@ -71,17 +71,27 @@ class MCPServer:
 
         # Search for .git starting from source directory
         current = source_dir
+        remote_candidates = ("origin", "upstream", "github")
         for _ in range(10):  # Limit search depth
-            if (current / ".git").exists():
-                config_path = current / ".git" / "config"
+            git_dir = current / ".git"
+            if git_dir.exists():
+                config_path = git_dir / "config"
                 if config_path.exists():
                     try:
                         config = ConfigParser()
                         config.read(config_path)
-                        origin_section = 'remote "origin"'
-                        if config.has_section(origin_section):
-                            url = config.get(origin_section, "url", fallback="").strip()
-                            if url:  # Validate URL exists
+
+                        for remote in remote_candidates:
+                            section = f'remote "{remote}"'
+                            if config.has_section(section):
+                                url = config.get(section, "url", fallback="").strip()
+                                parsed = self._parse_repo_from_url(url)
+                                if parsed:
+                                    return parsed
+
+                        for section in config.sections():
+                            if section.startswith('remote "'):
+                                url = config.get(section, "url", fallback="").strip()
                                 parsed = self._parse_repo_from_url(url)
                                 if parsed:
                                     return parsed
@@ -89,18 +99,39 @@ class MCPServer:
                         # Config parsing failed - continue to git command fallback
                         logger.debug("git_config_parse_failed", error=str(e))
 
+                for remote in remote_candidates:
+                    try:
+                        result = subprocess.run(
+                            ["git", "remote", "get-url", remote],
+                            cwd=current,
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
+                        )
+                        if result.returncode == 0:
+                            url = result.stdout.strip()
+                            parsed = self._parse_repo_from_url(url)
+                            if parsed:
+                                return parsed
+                    except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
+                        continue
+
                 try:
                     result = subprocess.run(
-                        ["git", "remote", "get-url", "origin"],
-                        cwd=current, capture_output=True, text=True, timeout=5
+                        ["git", "remote", "-v"],
+                        cwd=current,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
                     )
                     if result.returncode == 0:
-                        url = result.stdout.strip()
-                        parsed = self._parse_repo_from_url(url)
-                        if parsed:
-                            return parsed
+                        for line in result.stdout.splitlines():
+                            parts = line.split()
+                            if len(parts) >= 2:
+                                parsed = self._parse_repo_from_url(parts[1])
+                                if parsed:
+                                    return parsed
                 except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
-                    # Git command failed - continue to env var fallback
                     pass
                 break
             if current.parent == current:
@@ -310,8 +341,18 @@ class MCPServer:
             "rate_limit": {
                 "remaining": self.client.rate_limit_remaining,
                 "reset": self.client.rate_limit_reset
-            }
+            },
+            "graphql_rate_limit": {
+                "remaining": self.graphql.rate_limit_remaining,
+                "reset": self.graphql.rate_limit_reset,
+                "used": self.graphql.rate_limit_used,
+                "cost": self.graphql.rate_limit_cost,
+            },
         }
+
+    async def aclose(self) -> None:
+        self.client.close()
+        await self.graphql.aclose()
     
     def handlers(self) -> dict:
         """JSON-RPC handlers."""
@@ -391,7 +432,10 @@ async def run_stdio() -> None:
         raise ValueError("GITHUB_TOKEN environment variable required")
     
     server = MCPServer.create(token)
-    await server.serve_stdio()
+    try:
+        await server.serve_stdio()
+    finally:
+        await server.aclose()
 
 
 __all__ = ["MCPServer", "run_stdio"]

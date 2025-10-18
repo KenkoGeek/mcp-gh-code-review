@@ -69,10 +69,17 @@ class JSONRPCServer:
             raise ValueError(f"Unknown tool: {tool_name}")
         
         result = await self.handlers[tool_name](tool_args)
+
+        if isinstance(result, dict) and "content" in result:
+            raw_content = result["content"]
+            content = raw_content if isinstance(raw_content, list) else [raw_content]
+        else:
+            content = [{"type": "json", "json": result}]
+
         return {
             "jsonrpc": "2.0",
             "id": message.get("id"),
-            "result": {"content": [{"type": "text", "text": str(result)}]}
+            "result": {"content": content}
         }
 
     async def serve_stdio(self) -> None:

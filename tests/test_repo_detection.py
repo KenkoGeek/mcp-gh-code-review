@@ -65,3 +65,68 @@ def test_get_repo_reads_git_config(monkeypatch, tmp_path, remote_url, expected):
     server = MCPServer(token="token", client=MagicMock(), graphql=MagicMock())
 
     assert server._get_repo() == expected
+
+
+def test_get_repo_supports_upstream_remote(monkeypatch, tmp_path):
+    fake_repo = tmp_path / "project"
+    fake_repo.mkdir()
+
+    src_dir = fake_repo / "src" / "mcp_server"
+    src_dir.mkdir(parents=True)
+    server_file = src_dir / "server.py"
+    server_file.write_text("# stub")
+
+    git_dir = fake_repo / ".git"
+    git_dir.mkdir()
+    config_path = git_dir / "config"
+    config_path.write_text('[remote "upstream"]\n\turl = https://github.com/example/demo.git\n')
+
+    monkeypatch.setattr(server_module, "__file__", str(server_file))
+    monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+
+    def raise_file_not_found(*args, **kwargs):
+        raise FileNotFoundError()
+
+    monkeypatch.setattr(server_module.subprocess, "run", raise_file_not_found)
+
+    server = MCPServer(token="token", client=MagicMock(), graphql=MagicMock())
+
+    assert server._get_repo() == ("example", "demo")
+
+
+def test_get_repo_falls_back_to_remote_v(monkeypatch, tmp_path):
+    fake_repo = tmp_path / "project"
+    fake_repo.mkdir()
+
+    src_dir = fake_repo / "src" / "mcp_server"
+    src_dir.mkdir(parents=True)
+    server_file = src_dir / "server.py"
+    server_file.write_text("# stub")
+
+    git_dir = fake_repo / ".git"
+    git_dir.mkdir()
+
+    monkeypatch.setattr(server_module, "__file__", str(server_file))
+    monkeypatch.delenv("GITHUB_REPOSITORY", raising=False)
+
+    class DummyCompletedProcess:
+        def __init__(self, returncode: int, stdout: str = ""):
+            self.returncode = returncode
+            self.stdout = stdout
+
+    def fake_run(cmd, cwd=None, capture_output=None, text=None, timeout=None):
+        if cmd[:3] == ["git", "remote", "get-url"]:
+            return DummyCompletedProcess(returncode=1)
+        if cmd == ["git", "remote", "-v"]:
+            stdout = (
+                "origin https://github.com/sample/project.git (fetch)\n"
+                "origin https://github.com/sample/project.git (push)\n"
+            )
+            return DummyCompletedProcess(returncode=0, stdout=stdout)
+        raise AssertionError(f"Unexpected command: {cmd}")
+
+    monkeypatch.setattr(server_module.subprocess, "run", fake_run)
+
+    server = MCPServer(token="token", client=MagicMock(), graphql=MagicMock())
+
+    assert server._get_repo() == ("sample", "project")

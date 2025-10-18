@@ -10,6 +10,10 @@ async def test_health_tool():
     client = GitHubClient(token="test_token")
     graphql = GitHubGraphQLClient(token="test_token")
     server = MCPServer(token="test_token", client=client, graphql=graphql)
-    result = await server.health({})
-    assert result["status"] == "ok"
-    assert "rate_limit" in result
+    try:
+        result = await server.health({})
+        assert result["status"] == "ok"
+        assert "rate_limit" in result
+        assert "graphql_rate_limit" in result
+    finally:
+        await server.aclose()

@@ -17,10 +17,7 @@ dependencies = [
   "fastapi>=0.111",
   "uvicorn>=0.27",
   "pyyaml>=6.0",
-  "sqlalchemy>=2.0",
   "structlog>=24.1",
-  "python-json-logger>=2.0",
-  "cachetools>=5.3",
   "tenacity>=8.2"
 ]
 
@@ -37,7 +34,6 @@ dev = [
   "ruff>=0.4",
   "mypy>=1.8",
   "types-PyYAML",
-  "types-cachetools"
 ]
 
 [tool.pytest.ini_options]
