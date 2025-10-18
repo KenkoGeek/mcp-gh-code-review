@@ -11,7 +11,7 @@ A production-focused Model Context Protocol (MCP) server for automating GitHub p
 
 - **8 JSON-RPC Tools** - 5 PR tools + 3 issue tools + health check
 - **Webhook Integration** - FastAPI endpoint with GitHub signature verification
-- **13 Tests** - Comprehensive test coverage including error handling and security
+- **Automated Test Suite** - Pytest coverage across tools, error handling, and webhook flows
 - **Structured Logging** - JSON logs with rate limit tracking and error context
 - **Bot Detection** - Automatic identification of bot accounts with reply guidance
 
@@ -25,14 +25,14 @@ A production-focused Model Context Protocol (MCP) server for automating GitHub p
 uvx --from git+https://github.com/KenkoGeek/mcp-gh-code-review mcp-gh-review
 ```
 
-**Or install locally:**
+**Or install locally (Python 3.11+):**
 
 ```bash
 git clone https://github.com/KenkoGeek/mcp-gh-code-review.git
 cd mcp-gh-code-review
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 ### Configuration
@@ -163,6 +163,19 @@ docker run -p 8000:8000 \
   uvicorn mcp_server.webhooks:app --host 0.0.0.0
 ```
 
+## Development
+
+```bash
+# Python 3.11+ virtualenv recommended
+python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Lint and test
+ruff check src tests
+pytest --cov=mcp_server --cov-report=term --cov-report=xml
+```
+
 ## Available Tools
 
 ### Pull Request Tools
@@ -232,7 +245,7 @@ GitHub Webhooks → FastAPI → MCP Server → GitHub REST/GraphQL APIs
 
 ## Monitoring
 
-**Health Check:**
+**Webhook Health Endpoint:**
 ```bash
 curl http://localhost:8000/health
 ```
@@ -240,15 +253,14 @@ curl http://localhost:8000/health
 **Response:**
 ```json
 {
-  "status": "ok",
-  "version": "0.1.0",
-  "database_healthy": true,
-  "rate_limit": {
-    "remaining": 4850,
-    "reset": 1234567890
-  }
+  "status": "ok"
 }
 ```
+
+**MCP Health Tool (`health`):**
+- Returns GitHub REST and GraphQL rate-limit telemetry for connected token
+- Surfaces cached counts from `GitHubClient` and `GitHubGraphQLClient`
+- Useful for deciding when to throttle automation
 
 **Structured Logs:**
 - All operations logged with `structlog`
