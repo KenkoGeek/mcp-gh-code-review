@@ -40,6 +40,8 @@ pip install -e ".[dev]"
 ```bash
 cp .env.example .env
 # Edit .env with your credentials
+# GITHUB_TOKEN=ghp_your_token_here
+# GITHUB_REPOSITORY=owner/repo
 ```
 
 **Required:**
@@ -82,7 +84,8 @@ Connect from Claude Desktop, IDEs, or any MCP-compatible client.
         "mcp-gh-review"
       ],
       "env": {
-        "GITHUB_TOKEN": "ghp_your_token_here"
+        "GITHUB_TOKEN": "ghp_your_token_here",
+        "GITHUB_REPOSITORY": "owner/repo"
       }
     }
   }
@@ -97,7 +100,8 @@ Connect from Claude Desktop, IDEs, or any MCP-compatible client.
       "command": "/path/to/.venv/bin/python",
       "args": ["-m", "mcp_server.cli", "--stdio"],
       "env": {
-        "GITHUB_TOKEN": "ghp_your_token_here"
+        "GITHUB_TOKEN": "ghp_your_token_here",
+        "GITHUB_REPOSITORY": "owner/repo"
       }
     }
   }
@@ -106,6 +110,8 @@ Connect from Claude Desktop, IDEs, or any MCP-compatible client.
 
 **Run standalone:**
 ```bash
+export GITHUB_TOKEN=ghp_your_token_here
+export GITHUB_REPOSITORY=owner/repo
 python -m mcp_server.cli --stdio
 ```
 
@@ -137,11 +143,13 @@ uvicorn mcp_server.webhooks:app --host 0.0.0.0 --port 8000 --workers 4
 # MCP server
 docker run -i \
   -e GITHUB_TOKEN=ghp_xxx \
+  -e GITHUB_REPOSITORY=owner/repo \
   ghcr.io/kenkogeek/mcp-gh-code-review:latest
 
 # Webhook server
 docker run -p 8000:8000 \
   -e GITHUB_TOKEN=ghp_xxx \
+  -e GITHUB_REPOSITORY=owner/repo \
   -e WEBHOOK_SECRET=your_secret \
   ghcr.io/kenkogeek/mcp-gh-code-review:latest \
   uvicorn mcp_server.webhooks:app --host 0.0.0.0
@@ -153,11 +161,15 @@ docker run -p 8000:8000 \
 docker build -t mcp-gh-review .
 
 # Run MCP server
-docker run -i -e GITHUB_TOKEN=ghp_xxx mcp-gh-review
+docker run -i \
+  -e GITHUB_TOKEN=ghp_xxx \
+  -e GITHUB_REPOSITORY=owner/repo \
+  mcp-gh-review
 
 # Run webhook server
 docker run -p 8000:8000 \
   -e GITHUB_TOKEN=ghp_xxx \
+  -e GITHUB_REPOSITORY=owner/repo \
   -e WEBHOOK_SECRET=your_secret \
   mcp-gh-review \
   uvicorn mcp_server.webhooks:app --host 0.0.0.0
