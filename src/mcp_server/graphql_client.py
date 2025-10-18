@@ -29,7 +29,7 @@ class GitHubGraphQLClient:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def __aenter__(self) -> "GitHubGraphQLClient":
+    async def __aenter__(self) -> GitHubGraphQLClient:
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:

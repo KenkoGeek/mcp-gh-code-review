@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import weakref
 from dataclasses import dataclass, field
 from typing import NoReturn
-import weakref
 
 import httpx
 import structlog
@@ -146,7 +146,7 @@ class GitHubClient:
             self._finalizer.detach()
         self._client.close()
 
-    def __enter__(self) -> "GitHubClient":
+    def __enter__(self) -> GitHubClient:
         return self
 
     def __exit__(self, exc_type, exc, tb) -> None:
