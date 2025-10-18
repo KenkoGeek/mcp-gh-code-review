@@ -5,72 +5,77 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 
-A production-focused Model Context Protocol (MCP) server for automating GitHub pull request reviews, inline comment threads, and intelligent responses.
+A Model Context Protocol (MCP) server that automates GitHub pull request and issue workflows for MCP-compatible clients.
 
-## Features
+## Overview
 
-- **8 JSON-RPC Tools** - 5 PR tools + 3 issue tools + health check
-- **Webhook Integration** - FastAPI endpoint with GitHub signature verification
-- **13 Tests** - Comprehensive test coverage including error handling and security
-- **Structured Logging** - JSON logs with rate limit tracking and error context
-- **Bot Detection** - Automatic identification of bot accounts with reply guidance
+- 8 JSON-RPC tools for reviewing pull requests, inspecting issues, replying inline, and performing health checks
+- GitHub REST and GraphQL integrations with retry logic and rate limit tracking
+- Optional FastAPI webhook endpoint with HMAC signature validation
+- Structured JSON logging via `structlog` with configurable verbosity
+- Lightweight bot detection to tailor responses for automated users
 
-## Quick Start
+## Requirements
 
-### Installation
+- Python 3.11 or later
+- A GitHub personal access token (fine-grained or classic) with at least:
+  - `pull_requests:write`, `issues:write`, `metadata:read`, `contents:read` (fine-grained)
+  - or the `repo` scope (classic tokens)
+- Optional: `WEBHOOK_SECRET` to secure webhook deliveries
 
-**Using uvx (recommended - no installation required):**
+The server can detect the target repository from the current git remote. If you are not running inside a clone, set `GITHUB_REPOSITORY=owner/repo`.
+
+## Installation
+
+### Run with uvx (recommended)
 
 ```bash
 uvx --from git+https://github.com/KenkoGeek/mcp-gh-code-review mcp-gh-review
 ```
 
-**Or install locally:**
+### Local development install
 
 ```bash
 git clone https://github.com/KenkoGeek/mcp-gh-code-review.git
 cd mcp-gh-code-review
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
+pip install -e .[dev]
 ```
 
-### Configuration
+### Docker
 
 ```bash
-cp .env.example .env
-# Edit .env with your credentials
+docker build -t mcp-gh-review .
+docker run --rm -it \
+  -e GITHUB_TOKEN=ghp_your_token \
+  -e GITHUB_REPOSITORY=owner/repo \
+  mcp-gh-review
 ```
 
-**Required:**
-- `GITHUB_TOKEN` - GitHub personal access token with minimal permissions (see below)
-- `GITHUB_REPOSITORY` - Repository in format `owner/repo` (optional when running inside a git repository with a GitHub remote; the server reads `.git/config` automatically. If both are present, git detection takes precedence)
+## Configuration
 
-**GitHub Token Permissions:**
+Set the following environment variables before launching the server:
 
-*Fine-grained Personal Access Token (Recommended):*
-- **Repository permissions:**
-  - `pull_requests: write` - Create/update PR comments and reviews
-  - `issues: write` - Add comments to PR discussions
-  - `metadata: read` - Read basic repository information
-  - `contents: read` - Access repository files and structure
-
-*Personal Access Token (Classic):*
-- `repo` scope - Full repository access
-
-**Optional:**
-- `WEBHOOK_SECRET` - Secret for webhook signature verification
-- `LOG_LEVEL` - Logging level (DEBUG, INFO, WARNING, ERROR)
+- `GITHUB_TOKEN` (required) – GitHub authentication token
+- `GITHUB_REPOSITORY` (optional) – fallback repo in `owner/repo` format
+- `LOG_LEVEL` (optional) – `DEBUG`, `INFO`, `WARNING`, or `ERROR` (default: `INFO`)
+- `WEBHOOK_SECRET` (optional) – shared secret for webhook signature verification
 
 ## Usage
 
-### 1. MCP Client Integration
+### Run as an MCP server (stdio)
 
-Connect from Claude Desktop, IDEs, or any MCP-compatible client.
+```bash
+mcp-gh-review
+```
 
-**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+The entry point configures structured logging and starts a JSON-RPC 2.0 loop over stdio. Any MCP-compatible client can connect, request the tool list, and invoke the actions.
 
-**Option A: Using uvx (recommended):**
+#### Example Claude Desktop configuration
+
+Add the following snippet to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+
 ```json
 {
   "mcpServers": {
@@ -82,266 +87,71 @@ Connect from Claude Desktop, IDEs, or any MCP-compatible client.
         "mcp-gh-review"
       ],
       "env": {
-        "GITHUB_TOKEN": "ghp_your_token_here"
+        "GITHUB_TOKEN": "ghp_your_token_here",
+        "GITHUB_REPOSITORY": "owner/repo"
       }
     }
   }
 }
 ```
 
-**Option B: Using local installation:**
-```json
-{
-  "mcpServers": {
-    "github-review": {
-      "command": "/path/to/.venv/bin/python",
-      "args": ["-m", "mcp_server.cli", "--stdio"],
-      "env": {
-        "GITHUB_TOKEN": "ghp_your_token_here"
-      }
-    }
-  }
-}
-```
+### Available MCP tools
 
-**Run standalone:**
-```bash
-python -m mcp_server.cli --stdio
-```
+| Tool | Description |
+| --- | --- |
+| `review_pr` | Fetches PR metadata, reviews, and review threads (via REST + GraphQL) and annotates comments with bot/user markers. |
+| `reply_to_comment` | Replies to a specific inline review comment using its database ID. |
+| `get_review_threads` | Retrieves review threads with `isResolved` status. |
+| `submit_pending_review` | Submits a pending review using the GraphQL API. |
+| `list_issues` | Lists repository issues (excluding pull requests) in the requested state. |
+| `review_issue` | Returns issue details and comments with bot detection hints. |
+| `reply_to_issue_comment` | Creates a new issue comment reply. |
+| `health` | Returns basic health information and current REST API rate limits. |
 
-### 2. Webhook Server
+Each tool exposes a JSON schema describing the expected input parameters, which MCP clients can use for validation and UI generation.
 
-Receive and process GitHub webhook events.
+### Optional webhook endpoint
 
-**Local development:**
+The project also provides a minimal FastAPI application that validates HMAC signatures and accepts GitHub webhook payloads.
+
 ```bash
 uvicorn mcp_server.webhooks:app --reload
 ```
 
-**Production:**
-```bash
-uvicorn mcp_server.webhooks:app --host 0.0.0.0 --port 8000 --workers 4
-```
+When `WEBHOOK_SECRET` is configured, webhook deliveries must include the `X-Hub-Signature-256` header.
 
-**GitHub Webhook Configuration:**
-- Payload URL: `https://your-domain.com/webhook`
-- Content type: `application/json`
-- Secret: Set `WEBHOOK_SECRET` in `.env`
-- Events: Pull requests, Pull request reviews, Issue comments
+### Health check
 
-### 3. Docker Deployment
-
-**Using pre-built image from GitHub Container Registry:**
-
-```bash
-# MCP server
-docker run -i \
-  -e GITHUB_TOKEN=ghp_xxx \
-  ghcr.io/kenkogeek/mcp-gh-code-review:latest
-
-# Webhook server
-docker run -p 8000:8000 \
-  -e GITHUB_TOKEN=ghp_xxx \
-  -e WEBHOOK_SECRET=your_secret \
-  ghcr.io/kenkogeek/mcp-gh-code-review:latest \
-  uvicorn mcp_server.webhooks:app --host 0.0.0.0
-```
-
-**Build locally:**
-
-```bash
-docker build -t mcp-gh-review .
-
-# Run MCP server
-docker run -i -e GITHUB_TOKEN=ghp_xxx mcp-gh-review
-
-# Run webhook server
-docker run -p 8000:8000 \
-  -e GITHUB_TOKEN=ghp_xxx \
-  -e WEBHOOK_SECRET=your_secret \
-  mcp-gh-review \
-  uvicorn mcp_server.webhooks:app --host 0.0.0.0
-```
-
-## Available Tools
-
-### Pull Request Tools
-| Tool | Description |
-|------|-------------|
-| `review_pr` | Comprehensive PR analysis with reviews, comments, and threads |
-| `reply_to_comment` | Reply to inline PR comments using databaseId |
-| `get_review_threads` | Get review threads with isResolved status via GraphQL |
-| `submit_pending_review` | Submit pending reviews with specified event type |
-
-### Issue Tools
-| Tool | Description |
-|------|-------------|
-| `list_issues` | List all repository issues (filters out PRs automatically) |
-| `review_issue` | Get issue details with comments and bot/user annotations |
-| `reply_to_issue_comment` | Reply to issue comments |
-
-### System Tools
-| Tool | Description |
-|------|-------------|
-| `health` | Check server status and GitHub API rate limits |
-
-## Example Prompts
-
-**For pull request reviews:**
-- "Review PR #15 and suggest improvements"
-- "Analyze the changes in PR #23 and check for security issues"
-- "What are the unresolved comments in PR #8?"
-- "Reply to all unresolved comments in PR #12"
-- "Submit my pending review as APPROVE"
-
-**For issue management:**
-- "List all open issues in the repository"
-- "Review issue #10 and provide feedback"
-- "Reply to issue #5 with a status update"
-- "Show me all closed issues"
-
-The MCP server automatically:
-- Detects bot comments (won't reply to dependabot)
-- Identifies your own comments (won't reply to yourself)
-- Provides context-aware guidance for responses
-
-## Development
-
-### Testing
-
-```bash
-pip install -e .[dev]
-pytest
-pytest --cov=mcp_server  # With coverage
-```
-
-### Linting
-
-```bash
-ruff check src/
-mypy src/
-```
-
-## Architecture
-
-See [docs/architecture.md](docs/architecture.md) for detailed component diagrams and data flow.
-
-```
-GitHub Webhooks → FastAPI → MCP Server → GitHub REST/GraphQL APIs
-```
-
-## Monitoring
-
-**Health Check:**
 ```bash
 curl http://localhost:8000/health
 ```
 
-**Response:**
-```json
-{
-  "status": "ok",
-  "version": "0.1.0",
-  "database_healthy": true,
-  "rate_limit": {
-    "remaining": 4850,
-    "reset": 1234567890
-  }
-}
-```
+The response includes the cached REST API rate limit counters maintained by the MCP tools.
 
-**Structured Logs:**
-- All operations logged with `structlog`
-- JSON format for easy parsing
-- Includes context: event IDs, actors, actions
+## Logging
 
-## Security
+Logging is handled by `structlog` and emitted as JSON to stderr. Adjust verbosity with `LOG_LEVEL=DEBUG` for troubleshooting. REST and GraphQL interactions include context such as method, path, status, and remaining rate limit.
 
-- **Webhook Verification** - `X-Hub-Signature-256` HMAC validation
-- **Token Security** - Never logged, use environment variables or secret managers
-- **Non-root Container** - Docker runs as unprivileged `app` user
-- **Input Validation** - Pydantic models validate all inputs
-- **Rate Limit Tracking** - Monitors GitHub API limits
+## Development
 
-## Troubleshooting
-
-### Rate Limit Issues
-
-**Check current limits:**
 ```bash
-curl http://localhost:8000/health | jq .rate_limit
+pip install -e .[dev]
+pytest
+pytest --cov
+ruff check src/
+mypy src/
 ```
 
-**Solutions:**
-- Use GitHub App for higher limits (5000/hour vs 60/hour)
-- Enable conditional requests with ETags
-- Implement request caching
+- Tests cover the GitHub client, error handling, JSON-RPC routing, and webhook validation.
+- `pytest-asyncio` powers asynchronous server tests.
+- `ruff` and `mypy` keep the codebase linted and typed.
 
-### Authentication Errors
-
-**401 Unauthorized:**
-```bash
-# Verify token has required permissions
-gh auth status
-# Regenerate token if expired
-```
-
-**403 Forbidden:**
-- Check repository access permissions
-- Verify token scopes include `repo` or fine-grained permissions
-- Ensure not hitting secondary rate limits
-
-### Webhook Issues
-
-**Signature verification fails:**
-```bash
-# Verify WEBHOOK_SECRET matches GitHub configuration
-echo $WEBHOOK_SECRET
-# Check webhook delivery logs in GitHub settings
-```
-
-**Payload validation errors:**
-- Ensure webhook sends `application/json` content type
-- Verify payload includes required `action` field
-- Check GitHub webhook delivery response for details
-
-### Connection Errors
-
-**Network timeouts:**
-```bash
-# Test GitHub API connectivity
-curl -H "Authorization: token $GITHUB_TOKEN" https://api.github.com/user
-```
-
-**Solutions:**
-- Check firewall/proxy settings
-- Verify DNS resolution for api.github.com
-- Enable retry logic (already implemented for network errors)
-
-### Logging and Debugging
-
-**Enable debug logging:**
-```bash
-export LOG_LEVEL=DEBUG
-python -m mcp_server.cli --stdio
-```
-
-**View structured logs:**
-```bash
-# Logs output to stderr in JSON format
-python -m mcp_server.cli --stdio 2> debug.log
-jq . debug.log  # Pretty print JSON logs
-```
-
-**Common log events:**
-- `github_api_request` - API calls with method, path, status
-- `review_pr_start` / `review_pr_complete` - Tool invocations
-- `error` - Failures with context and GitHub error messages
+See `docs/architecture.md` for a component overview and data flow diagram.
 
 ## Contributing
 
-[Check here](CONTRIBUTING.md)
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidance on setting up your environment, running checks, and submitting pull requests.
 
 ## License
 
-MIT License - See [LICENSE](LICENSE) for details.
+MIT License – see [LICENSE](LICENSE) for details.
