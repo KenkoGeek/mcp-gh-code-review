@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.2.0...v1.2.1) (2025-10-08)
+
+
+### Bug Fixes
+
+* **server:** detect owner and repo from git config ([#20](https://github.com/KenkoGeek/mcp-gh-code-review/issues/20)) ([9de4510](https://github.com/KenkoGeek/mcp-gh-code-review/commit/9de4510c2a9c16a8c83d8a50ef2ef9834fe9772a))
+
 # [1.2.0](https://github.com/KenkoGeek/mcp-gh-code-review/compare/v1.1.3...v1.2.0) (2025-10-08)
 
 
