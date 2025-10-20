@@ -77,7 +77,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Wait for CodeQL
-        uses: lewagon/wait-on-check-action@595dabb3acf442d47e29c9ec9ba44db0c6bdd18f # v1.3.4
+        uses: lewagon/wait-on-check-action@3603e826ee561ea102b58accb5ea55a1a7482343 # v1.3.4
         with:
           ref: ${{ github.sha }}
           check-name: 'Analyze (python)'
